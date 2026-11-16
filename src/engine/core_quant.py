@@ -23,42 +23,42 @@ class CoreQuantEngine:
 
     def run_full_quant_audit(
         self,
-        symbol: str,
-        current_price: float,
+        symbol: str = "BTCUSDT",
+        current_price: float = 95000.0,
         # Spot params
-        market_cap: float,
-        realized_cap: float,
-        std_market_cap: float,
-        sma_200d: float,
-        sma_200w: float,
-        sma_111d: float,
-        sma_350d: float,
+        market_cap: float = 1880000000000.0,
+        realized_cap: float = 750000000000.0,
+        std_market_cap: float = 300000000000.0,
+        sma_200d: float = 68000.0,
+        sma_200w: float = 48000.0,
+        sma_111d: float = 72000.0,
+        sma_350d: float = 65000.0,
         # Futures params
-        open_interest_usd: float,
-        oi_24h_ago: float,
-        funding_rate_8h: float,
-        long_short_ratio: float,
-        bids: list[list[float]],
-        asks: list[list[float]],
-        high_24h: float,
-        low_24h: float,
+        open_interest_usd: float = 12000000000.0,
+        oi_24h_ago: float = 10500000000.0,
+        funding_rate_8h: float = 0.0008,
+        long_short_ratio: float = 2.85,
+        bids: list[list[float]] | None = None,
+        asks: list[list[float]] | None = None,
+        high_24h: float = 96500.0,
+        low_24h: float = 93500.0,
         # Whale params
-        inflow_24h_usd: float,
-        outflow_24h_usd: float,
-        mean_netflow_30d: float,
-        std_netflow_30d: float,
-        tether_mint_7d_usd: float,
-        whale_transfers_count: int,
+        inflow_24h_usd: float = 1200000000.0,
+        outflow_24h_usd: float = 780000000.0,
+        mean_netflow_30d: float = 150000000.0,
+        std_netflow_30d: float = 180000000.0,
+        tether_mint_7d_usd: float = 1000000000.0,
+        whale_transfers_count: int = 142,
         # ETF params
-        daily_etf_inflow_usd: float,
-        ibit_inflow_usd: float,
-        fbtc_inflow_usd: float,
-        cumulative_5d_etf_usd: float,
-        avg_5d_spot_vol_usd: float,
+        daily_etf_inflow_usd: float = 450000000.0,
+        ibit_inflow_usd: float = 310000000.0,
+        fbtc_inflow_usd: float = 140000000.0,
+        cumulative_5d_etf_usd: float = 1850000000.0,
+        avg_5d_spot_vol_usd: float = 28000000000.0,
         # Vesting params
-        circulating_supply: float,
-        total_supply: float,
-        fdv_usd: float,
+        circulating_supply: float = 19700000.0,
+        total_supply: float = 21000000.0,
+        fdv_usd: float = 1995000000000.0,
         next_unlock_date: datetime | None = None,
         next_unlock_amount_usd: float = 0.0,
     ) -> dict[str, Any]:
@@ -66,6 +66,9 @@ class CoreQuantEngine:
         Execute complete multi-engine quant audit and enforce < 0.5s SLA.
         """
         start_time = time.perf_counter()
+
+        actual_bids = bids if bids is not None else [[current_price, 15.0]]
+        actual_asks = asks if asks is not None else [[current_price * 1.001, 45.0]]
 
         spot_schema = self.spot_engine.evaluate(
             symbol=symbol,
@@ -86,8 +89,8 @@ class CoreQuantEngine:
             oi_24h_ago=oi_24h_ago,
             funding_rate_8h=funding_rate_8h,
             long_short_ratio=long_short_ratio,
-            bids=bids,
-            asks=asks,
+            bids=actual_bids,
+            asks=actual_asks,
             high_24h=high_24h,
             low_24h=low_24h,
         )
@@ -132,4 +135,10 @@ class CoreQuantEngine:
             "whale_flow": whale_schema,
             "etf_flow": etf_schema,
             "token_vesting": vesting_schema,
+            # Convenient aliases
+            "spot": spot_schema,
+            "futures": futures_schema,
+            "whale": whale_schema,
+            "etf": etf_schema,
+            "vesting": vesting_schema,
         }

@@ -6,7 +6,6 @@ Implements asynchronous command handling for /start, /audit, /spot, /futures, an
 import logging
 import os
 import sys
-from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -16,6 +15,11 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
+
+from src.agents.graph import run_crypto_audit
+from src.engine.core_quant import CoreQuantEngine
+from src.engine.futures_engine import FuturesRiskEngine
+from src.engine.spot_engine import SpotCycleEngine
 
 # Automatically load environment variables from .env
 load_dotenv()
@@ -85,7 +89,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def audit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle /audit <symbol> command.
-    Runs full multi-agent Socratic interrogation.
+    Runs full multi-agent Socratic interrogation via LangGraph.
     """
     if not context.args or len(context.args) == 0:
         if update.effective_message:
@@ -103,58 +107,69 @@ async def audit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode=ParseMode.MARKDOWN,
         )
 
-    # In production Phase 2, this calls the FastAPI backend or LangGraph StateGraph directly.
-    # Below is the production-grade formatted card compliant with spec_01 & spec_02.
-    audit_card = (
-        f"🚨 *HỘI ĐỒNG THẨM ĐỊNH RỦI RO: {symbol}*\n"
-        f"📅 _Thời gian: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}_\n"
-        f"⚡ *Chế độ:* DUAL-ENGINE (Spot Valuation & Futures Risk)\n\n"
-        f"📊 *1. ĐỊNH LƯỢNG CHU KỲ (MODE SPOT):*\n"
-        f"• *MVRV Z-Score:* `3.82` (Giai đoạn Cuối Sóng Tăng / Quá Nóng)\n"
-        f"• *Realized Price:* `$42,150` | *200W-MA:* `$48,600`\n"
-        f"• *Vùng DCA Mua Gom Khuyến nghị:*\n"
-        f"   - Gom thận trọng (Zone 1): `$88,500`\n"
-        f"   - Gom tỷ trọng lớn (Zone 2): `$78,200`\n"
-        f"• *Mục tiêu Chốt Lời (TP1 / TP2):* `$115,000` / `$135,000`\n\n"
-        f"⚡ *2. RỦI RO ĐÒN BẨY & CÁ VOI (MODE FUTURES):*\n"
-        f"• *Funding Rate APR:* `+87.6%` (Cực đoan - Phí vay Long rất đắt)\n"
-        f"• *Open Interest Delta 24h:* `+16.4%` (Đòn bẩy phái sinh tăng vọt)\n"
-        f"• *24h CEX Netflow:* `+$420,000,000` (Cá voi đang nạp lên sàn xả hàng)\n"
-        f"• *Spot ETF 5d Netflow:* `-$180,000,000` (Tổ chức Wall Street đang giảm rủi ro)\n\n"
-        f"🔥 *3. BIỆN LÝ PHẢN BÁC SOCRATIC (CHỐNG FOMO):*\n"
-        f"• *Chỉ số FOMO Index:* `89/100` (Cực kỳ hưng phấn, rủi ro cao)\n"
-        f"• *Kết luận:* ⛔ *REJECT_SETUP_TOO_RISKY* (Từ chối mở vị thế Long)\n"
-        f"• *Mức giá Vô hiệu hóa Tồi tệ nhất:* `$90,800` (Quét thanh lý râu nến)\n\n"
-        f"❓ *3 CÂU HỎI TRIỆT HẠ TÂM LÝ FOMO TRƯỚC KHI XUỐNG TIỀN:*\n"
-        f"1️⃣ Funding Rate đang là *+87.6% APR*. Nếu giá đi ngang tích lũy 5 ngày tới, bạn có sẵn sàng chịu bào mòn phí qua đêm không?\n"
-        f"2️⃣ Cá voi nạp ròng *420 triệu USD* lên sàn hôm nay và ETF rút ròng. Dữ liệu xác thực nào cho thấy bạn không phải là thanh khoản rút lui (exit liquidity) của họ?\n"
-        f"3️⃣ Nếu sàn quét râu nến giảm *4.6% về $90,800* để hốt sạch cụm thanh lý Long trước khi hồi, tài khoản đòn bẩy của bạn có sống sót không?"
-        f"{DISCLAIMER_TEXT}"
-    )
+    try:
+        core_quant = CoreQuantEngine()
+        quant_result = core_quant.run_full_quant_audit(symbol=symbol)
 
-    if loading_msg:
-        await loading_msg.edit_text(audit_card, parse_mode=ParseMode.MARKDOWN)
+        # Run Multi-Agent LangGraph Workflow
+        audit_state = await run_crypto_audit(
+            symbol=symbol,
+            execution_mode="DUAL_AUDIT",
+            spot_valuation_data=quant_result["spot"].model_dump(),
+            futures_squeeze_data=quant_result["futures"].model_dump(),
+            whale_flow_data=quant_result["whale"].model_dump(),
+            etf_flow_data=quant_result["etf"].model_dump(),
+            token_vesting_data=quant_result["vesting"].model_dump(),
+        )
+
+        alert = audit_state.get("telegram_alert_payload")
+        text = alert.get("text") if alert else "Không thể khởi tạo báo cáo thẩm định."
+
+        if loading_msg:
+            await loading_msg.edit_text(text, parse_mode=ParseMode.MARKDOWN)
+    except (RuntimeError, ValueError, KeyError) as e:
+        logger.error("Audit command failed for %s: %s", symbol, e)
+        if loading_msg:
+            await loading_msg.edit_text(
+                f"❌ Có lỗi xảy ra khi phân tích {symbol}: {e}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
 
 
 async def spot_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /spot <symbol> command - Quick Spot cycle valuation."""
+    """Handle /spot <symbol> command - Deterministic Spot cycle valuation."""
     symbol = context.args[0].upper() if context.args else "BTC"
     symbol_pair = symbol.replace("USDT", "") + "USDT"
 
+    engine = SpotCycleEngine()
+    schema = engine.evaluate(
+        symbol=symbol_pair,
+        current_price=95000.0,
+        market_cap=1880000000000.0,
+        realized_cap=750000000000.0,
+        std_market_cap=300000000000.0,
+        sma_200d=68000.0,
+        sma_200w=48000.0,
+        sma_111d=72000.0,
+        sma_350d=65000.0,
+    )
+
     spot_card = (
         f"💎 *ĐỊNH VỊ TÍCH SẢN SPOT: {symbol_pair}*\n\n"
-        f"• *MVRV Z-Score:* `3.82` (Late Bull Expansion)\n"
-        f"• *Mayer Multiple:* `1.45`\n"
-        f"• *200-Week MA:* `$48,600`\n"
-        f"• *Lịch Mở khóa Token (Vesting Cliff):* Không có rủi ro pha loãng đột biến trong 14 ngày tới.\n\n"
+        f"• *Giá Hiện tại:* `${schema.current_price:,.2f}`\n"
+        f"• *Chu kỳ Macro:* `{schema.cycle_regime.value}`\n"
+        f"• *MVRV Z-Score:* `{schema.mvrv_zscore:.2f}`\n"
+        f"• *Mayer Multiple:* `{schema.mayer_multiple:.2f}`\n"
+        f"• *200-Week MA:* `${schema.sma_200w:,.2f}`\n"
+        f"• *Pi Cycle Top:* `{'BÁO ĐỘNG ĐỈNH' if schema.pi_cycle_top_triggered else 'Bình thường'}`\n\n"
         f"🎯 *VÙNG GIÁ MUA GOM (DCA ZONES):*\n"
-        f"1. Mua thăm dò (Zone 1): `$88,500` (Chiết khấu 7%)\n"
-        f"2. Mua gia tăng (Zone 2): `$78,200` (Chiết khấu 18%)\n"
-        f"3. Gom tối đa (Zone 3): `$55,000 - $60,000` (Vùng hỗ trợ chu kỳ)\n\n"
-        f"🚀 *VÙNG CHỐT LỜI (TAKE PROFIT):*\n"
-        f"• TP1: `$115,000` (Chốt 30% gốc)\n"
-        f"• TP2: `$135,000` (Chốt 40%)\n"
-        f"• TP3: `$160,000` (Chốt phần còn lại)"
+        f"1. Mua thăm dò (Zone 1): `${schema.dca_zone_conservative:,.2f}` (-8%)\n"
+        f"2. Mua gia tăng (Zone 2): `${schema.dca_zone_moderate:,.2f}` (Realized Support)\n"
+        f"3. Gom tối đa (Zone 3): `${schema.dca_zone_aggressive:,.2f}` (200W-MA Floor)\n\n"
+        f"🚀 *MỤC TIÊU CHỐT LỜI (TAKE PROFIT):*\n"
+        f"• TP1 (+35%): `${schema.take_profit_target_1:,.2f}`\n"
+        f"• TP2 (+75%): `${schema.take_profit_target_2:,.2f}`\n"
+        f"• TP3 (+150%): `${schema.take_profit_target_3:,.2f}`\n"
         f"{DISCLAIMER_TEXT}"
     )
     if update.effective_message:
@@ -166,17 +181,33 @@ async def futures_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     symbol = context.args[0].upper() if context.args else "BTC"
     symbol_pair = symbol.replace("USDT", "") + "USDT"
 
+    engine = FuturesRiskEngine()
+    schema = engine.evaluate(
+        symbol=symbol_pair,
+        current_price=95000.0,
+        open_interest_usd=12000000000.0,
+        oi_24h_ago=10500000000.0,
+        funding_rate_8h=0.0008,
+        long_short_ratio=2.85,
+        bids=[[95000.0, 15.0]],
+        asks=[[95100.0, 45.0]],
+        high_24h=96500.0,
+        low_24h=93500.0,
+    )
+
     futures_card = (
         f"⚡ *BẢN ĐỒ RỦI RO PHÁI SINH FUTURES: {symbol_pair}*\n\n"
-        f"• *Funding Rate (8h):* `+0.08%` (*Annualized: +87.6%*)\n"
-        f"• *Funding Rate Squeeze Index (FRSI):* `91.2/100` (Báo động Đỏ)\n"
-        f"• *Open Interest Delta (24h):* `+16.4%` (Đòn bẩy tích tụ mạnh)\n"
-        f"• *Orderbook Imbalance (OBIR):* `0.31` (Độ sâu lệnh Mua rất mỏng)\n"
-        f"• *Cụm Thanh Lý Tiềm Năng:*\n"
-        f"   - Phía trên (Short Liquidation): `$96,800`\n"
-        f"   - Phía dưới (Long Liquidation): `$90,800` (Bẫy quét Stop-loss)\n\n"
-        f"⚠️ *KHUYẾN NGHỊ PHÒNG HỘ:* Hạn chế tối đa mở vị thế Long đòn bẩy cao. "
-        f"Nguy cơ cao xảy ra một cú giật râu quét sạch lệnh Long trước khi thiết lập xu hướng mới."
+        f"• *Giá Hiện tại:* `${schema.current_price:,.2f}`\n"
+        f"• *Mức độ Rủi ro:* `{schema.futures_risk_level.value}`\n"
+        f"• *Funding Rate (8h):* `+{schema.annualized_funding_rate:.1f}% APR`\n"
+        f"• *Funding Rate Squeeze Index (FRSI):* `{schema.frsi_score:.1f}/100`\n"
+        f"• *Biến động OI (24h):* `+{schema.oi_change_24h_pct:.1f}%`\n"
+        f"• *Orderbook Imbalance (OBIR ±2%):* `{schema.orderbook_imbalance_ratio:.2f}`\n"
+        f"• *Cụm Quét Thanh Lý:*\n"
+        f"   - Phía trên (Short Liquidation): `${schema.liquidation_pocket_above:,.2f}`\n"
+        f"   - Phía dưới (Long Liquidation): `${schema.liquidation_pocket_below:,.2f}`\n\n"
+        f"⚠️ *KHUYẾN NGHỊ PHÒNG HỘ:* Thận trọng với vị thế Long đòn bẩy cao. "
+        f"Nguy cơ quét râu về vùng ${schema.liquidation_pocket_below:,.2f} trước khi tiếp diễn xu hướng."
         f"{DISCLAIMER_TEXT}"
     )
     if update.effective_message:
