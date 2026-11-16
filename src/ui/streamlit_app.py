@@ -786,8 +786,8 @@ with tab_bot:
     with st.expander("📋 Nhật Ký Hoạt Động Của Bot (Activity Logs)"):
         logs = trading_bot_coordinator.activity_logs
         if logs:
-            for l in reversed(logs[-15:]):
-                st.caption(f"`{l['timestamp']}` - **[{l['event']}]** {l['message']}")
+            for item in reversed(logs[-15:]):
+                st.caption(f"`{item['timestamp']}` - **[{item['event']}]** {item['message']}")
         else:
             st.caption("Chưa có sự kiện nào.")
 
