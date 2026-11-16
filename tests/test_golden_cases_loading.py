@@ -4,7 +4,6 @@ Unit test to verify all 10 Golden Historical Cases exist and have valid structur
 
 import json
 from pathlib import Path
-import pytest
 
 GOLDEN_EVAL_DIR = Path("data/golden_eval")
 

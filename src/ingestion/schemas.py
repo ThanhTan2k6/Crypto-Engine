@@ -6,8 +6,8 @@ Supports Dual-Engine (Mode Spot & Mode Futures), Whale Tracking, Spot ETF & Tele
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CycleRegime(str, Enum):
@@ -94,7 +94,7 @@ class WhaleFlowSchema(BaseModel):
     tether_mint_7d_usd: float = Field(..., ge=0.0, description="USDT Treasury Minting in 7 days")
     whale_transfers_count_1m_plus: int = Field(..., ge=0)
     whale_sentiment: str = Field(..., description="ACCUMULATION, DISTRIBUTION, NEUTRAL")
-    hard_red_flags: List[str] = Field(default_factory=list)
+    hard_red_flags: list[str] = Field(default_factory=list)
 
 
 class TokenVestingSchema(BaseModel):
@@ -107,7 +107,7 @@ class TokenVestingSchema(BaseModel):
     fdv_usd: float = Field(..., gt=0.0)
     market_cap_usd: float = Field(..., gt=0.0)
     fdv_mc_ratio: float = Field(..., gt=0.0)
-    next_unlock_date: Optional[datetime] = None
+    next_unlock_date: datetime | None = None
     next_unlock_amount_usd: float = Field(default=0.0)
     next_unlock_pct_of_circulating: float = Field(default=0.0)
     dilution_risk: str = Field(..., description="LOW, MODERATE, HIGH_PREDATORY_UNLOCK")
@@ -119,9 +119,9 @@ class SocraticCritiqueSchema(BaseModel):
     symbol: str
     timestamp: datetime
     fomo_index: float = Field(..., ge=0.0, le=100.0, description="100 = Peak Irrational Euphoria")
-    fatal_socratic_questions: List[str] = Field(..., min_length=3, max_length=3)
+    fatal_socratic_questions: list[str] = Field(..., min_length=3, max_length=3)
     worst_case_invalidation_price: float = Field(..., gt=0.0)
-    core_thesis_flaws: List[str] = Field(..., min_length=1)
+    core_thesis_flaws: list[str] = Field(..., min_length=1)
     anti_fomo_verdict: AntiFomoVerdict
     max_recommended_allocation_pct: float = Field(..., ge=0.0, le=100.0)
 
@@ -135,4 +135,4 @@ class TelegramAlertPayload(BaseModel):
     alert_type: str = Field(..., description="WHALE_DUMP, SQUEEZE_WARNING, TETHER_MINT, AUDIT_RESPONSE")
     urgency_level: str = Field(..., description="INFO, WARNING, CRITICAL_EMERGENCY")
     markdown_message: str
-    action_url: Optional[str] = None
+    action_url: str | None = None

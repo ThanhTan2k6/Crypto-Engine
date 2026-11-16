@@ -2,8 +2,8 @@
 Unit tests for Deterministic Quant Engine: Whale Netflows, Tether Minting, Spot ETF & Token Vesting.
 """
 
-from datetime import datetime, timezone, timedelta
-import pytest
+from datetime import UTC, datetime, timedelta
+
 from src.engine.whale_engine import WhaleFlowEngine
 
 
@@ -45,7 +45,7 @@ def test_token_vesting_dilution():
     assert btc_vesting.fdv_mc_ratio == 1.06
 
     # Predatory Low Float Token: 8% circulating, FDV/MC 12.5, 25% unlock cliff
-    unlock_dt = datetime.now(timezone.utc) + timedelta(days=5)
+    unlock_dt = datetime.now(UTC) + timedelta(days=5)
     predatory_vesting = engine.evaluate_token_vesting(
         symbol="SUI",
         circulating_supply=80000000.0,

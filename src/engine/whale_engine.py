@@ -4,14 +4,12 @@ STRICT INVARIANT: PURE PYTHON / NUMPY / PANDAS ONLY. ZERO LLM IMPORTS ALLOWED.
 Calculates CNAI, Netflow Z-score, Tether Velocity (TTMV), ETF Momentum (EIMI), and Vesting Cliff Risk.
 """
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
-import numpy as np
+from datetime import UTC, datetime
 
 from src.ingestion.schemas import (
-    WhaleFlowSchema,
     ETFNetflowSchema,
     TokenVestingSchema,
+    WhaleFlowSchema,
 )
 
 
@@ -72,13 +70,13 @@ class WhaleFlowEngine:
         timestamp: datetime | None = None,
     ) -> WhaleFlowSchema:
         """Evaluate whale exchange netflows and stablecoin velocity."""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         netflow = float(inflow_24h_usd - outflow_24h_usd)
         zscore = self.calculate_netflow_zscore(netflow, mean_30d, std_30d)
         cnai = self.calculate_cnai(zscore)
         sentiment = self.classify_whale_sentiment(cnai)
 
-        red_flags: List[str] = []
+        red_flags: list[str] = []
         if zscore >= 2.0:
             red_flags.append("MASSIVE_CEX_INFLOW_ALERT")
         if whale_transfers_count_1m_plus >= 10 and netflow > 0:
@@ -107,7 +105,7 @@ class WhaleFlowEngine:
         timestamp: datetime | None = None,
     ) -> ETFNetflowSchema:
         """Evaluate institutional ETF accumulation or distribution."""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         eimi = self.calculate_etf_momentum_index(cumulative_5d_netflow_usd, avg_5d_spot_volume_usd)
         bias = "ACCUMULATION" if cumulative_5d_netflow_usd > 50000000.0 else ("DISTRIBUTION" if cumulative_5d_netflow_usd < -50000000.0 else "NEUTRAL")
 
@@ -128,7 +126,7 @@ class WhaleFlowEngine:
         total_supply: float,
         market_cap_usd: float,
         fdv_usd: float,
-        next_unlock_date: Optional[datetime] = None,
+        next_unlock_date: datetime | None = None,
         next_unlock_amount_usd: float = 0.0,
     ) -> TokenVestingSchema:
         """Evaluate token dilution risk from vesting cliffs and low float."""

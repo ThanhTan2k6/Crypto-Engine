@@ -4,11 +4,9 @@ STRICT INVARIANT: PURE PYTHON / NUMPY / PANDAS ONLY. ZERO LLM IMPORTS ALLOWED.
 Calculates MVRV Z-Score, 200W-MA, Mayer Multiple, Pi Cycle, Algorithmic DCA & Take-Profit Zones.
 """
 
-from typing import Tuple, Dict, Any
-from datetime import datetime, timezone
-import numpy as np
+from datetime import UTC, datetime
 
-from src.ingestion.schemas import SpotCycleValuationSchema, CycleRegime
+from src.ingestion.schemas import CycleRegime, SpotCycleValuationSchema
 
 
 class SpotCycleEngine:
@@ -69,7 +67,7 @@ class SpotCycleEngine:
     @staticmethod
     def calculate_dca_zones(
         current_price: float, realized_price: float, sma_200w: float
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """
         Calculate 3 algorithmic DCA accumulation levels:
         - Zone 1 (Conservative): Current Price * 0.92 (8% pull-back)
@@ -82,7 +80,7 @@ class SpotCycleEngine:
         return zone_1, zone_2, zone_3
 
     @staticmethod
-    def calculate_take_profit_zones(current_price: float) -> Tuple[float, float, float]:
+    def calculate_take_profit_zones(current_price: float) -> tuple[float, float, float]:
         """
         Calculate 3 algorithmic profit-taking targets:
         - TP 1 (Initial De-risk): Current Price * 1.35 (+35%)
@@ -122,7 +120,7 @@ class SpotCycleEngine:
         timestamp: datetime | None = None,
     ) -> SpotCycleValuationSchema:
         """Execute full deterministic spot cycle evaluation."""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         realized_price = realized_cap / (market_cap / current_price) if market_cap > 0 else current_price * 0.6
         
         mvrv_z = round(self.calculate_mvrv_zscore(market_cap, realized_cap, std_market_cap), 2)

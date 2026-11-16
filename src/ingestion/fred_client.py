@@ -4,11 +4,12 @@ Ingests Federal Funds Rate (DFF), CPI (CPIAUCSL), US 10Y Yield (DGS10),
 10Y-2Y Spread (T10Y2Y), and DXY Trade-Weighted Dollar Index (DTWEXBGS).
 """
 
-from typing import Dict, Any, Optional
-import os
-import httpx
 import logging
-from datetime import datetime
+import os
+from datetime import UTC, datetime
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +19,14 @@ FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 class FredMacroClient:
     """Client for querying Federal Reserve Macro Economic Series."""
 
-    def __init__(self, api_key: Optional[str] = None, timeout_seconds: float = 6.0) -> None:
+    def __init__(self, api_key: str | None = None, timeout_seconds: float = 6.0) -> None:
         self.api_key = api_key or os.getenv("FRED_API_KEY", "")
         self.timeout = timeout_seconds
 
     async def get_latest_observation(self, series_id: str) -> float:
         """Fetch the most recent valid numeric observation for a given series."""
         if not self.api_key or self.api_key == "your_fred_api_key_here":
-            logger.warning(f"FRED_API_KEY not configured. Returning offline baseline for {series_id}.")
+            logger.warning("FRED_API_KEY not configured. Returning offline baseline for %s.", series_id)
             return self._get_offline_fallback(series_id)
 
         params = {
@@ -45,20 +46,20 @@ class FredMacroClient:
                     if val and val != ".":
                         return float(val)
                 return self._get_offline_fallback(series_id)
-            except Exception as e:
-                logger.error(f"Failed to fetch FRED series {series_id}: {e}. Using fallback.")
+            except (httpx.HTTPError, ValueError) as e:
+                logger.error("Failed to fetch FRED series %s: %s. Using fallback.", series_id, e)
                 return self._get_offline_fallback(series_id)
 
-    async def get_macro_snapshot(self) -> Dict[str, Any]:
+    async def get_macro_snapshot(self) -> dict[str, Any]:
         """Fetch complete macroeconomic telemetry in parallel."""
         fed_funds = await self.get_latest_observation("DFF")
-        cpi = await self.get_latest_observation("CPIAUCSL")
+        _cpi = await self.get_latest_observation("CPIAUCSL")
         yield_10y = await self.get_latest_observation("DGS10")
         yield_spread = await self.get_latest_observation("T10Y2Y")
         dxy = await self.get_latest_observation("DTWEXBGS")
 
         return {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
             "fed_funds_rate": fed_funds,
             "cpi_yoy": 3.1,  # Calculated or baseline YoY
             "dxy_index": dxy,

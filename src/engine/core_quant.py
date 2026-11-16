@@ -4,19 +4,12 @@ STRICT INVARIANT: PURE PYTHON / NUMPY / PANDAS ONLY. ZERO LLM IMPORTS ALLOWED.
 Assembles complete deterministic quantitative intelligence under < 0.5s SLA.
 """
 
-from typing import Dict, Any, Optional
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
-from src.ingestion.schemas import (
-    SpotCycleValuationSchema,
-    FuturesSqueezeSchema,
-    ETFNetflowSchema,
-    WhaleFlowSchema,
-    TokenVestingSchema,
-)
-from src.engine.spot_engine import SpotCycleEngine
 from src.engine.futures_engine import FuturesRiskEngine
+from src.engine.spot_engine import SpotCycleEngine
 from src.engine.whale_engine import WhaleFlowEngine
 
 
@@ -66,9 +59,9 @@ class CoreQuantEngine:
         circulating_supply: float,
         total_supply: float,
         fdv_usd: float,
-        next_unlock_date: Optional[datetime] = None,
+        next_unlock_date: datetime | None = None,
         next_unlock_amount_usd: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute complete multi-engine quant audit and enforce < 0.5s SLA.
         """
@@ -131,7 +124,7 @@ class CoreQuantEngine:
 
         return {
             "symbol": symbol.upper(),
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
             "execution_latency_ms": round(elapsed_ms, 2),
             "sla_passed": elapsed_ms < 500.0,
             "spot_valuation": spot_schema,

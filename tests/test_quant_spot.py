@@ -3,7 +3,6 @@ Unit tests for Deterministic Quant Engine: Mode Spot.
 Verifies MVRV Z-Score, Mayer Multiple, 200W-MA, Pi Cycle, Algorithmic DCA & Take-Profit Zones.
 """
 
-import pytest
 from src.engine.spot_engine import SpotCycleEngine
 from src.ingestion.schemas import CycleRegime
 

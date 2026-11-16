@@ -3,7 +3,6 @@ Unit tests for Deterministic Quant Engine: Mode Futures.
 Verifies Annualized Funding Rate, FRSI, OI Change %, Orderbook Imbalance (OBIR), Liquidation Pockets.
 """
 
-import pytest
 from src.engine.futures_engine import FuturesRiskEngine
 from src.ingestion.schemas import FuturesRiskLevel
 

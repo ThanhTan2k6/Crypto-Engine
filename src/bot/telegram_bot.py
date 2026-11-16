@@ -3,10 +3,9 @@ Telegram Risk Alert & Socratic Audit Bot for CryptoIntel-Engine.
 Implements asynchronous command handling for /start, /audit, /spot, /futures, and /subscribe.
 """
 
-import os
 import logging
-from typing import List, Optional
-from datetime import datetime
+import os
+from datetime import UTC, datetime
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -103,7 +102,7 @@ async def audit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Below is the production-grade formatted card compliant with spec_01 & spec_02.
     audit_card = (
         f"🚨 *HỘI ĐỒNG THẨM ĐỊNH RỦI RO: {symbol}*\n"
-        f"📅 _Thời gian: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}_\n"
+        f"📅 _Thời gian: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}_\n"
         f"⚡ *Chế độ:* DUAL-ENGINE (Spot Valuation & Futures Risk)\n\n"
         f"📊 *1. ĐỊNH LƯỢNG CHU KỲ (MODE SPOT):*\n"
         f"• *MVRV Z-Score:* `3.82` (Giai đoạn Cuối Sóng Tăng / Quá Nóng)\n"

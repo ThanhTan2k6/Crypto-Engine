@@ -3,10 +3,11 @@ Bybit Public REST Client for CryptoIntel-Engine.
 Fallback data provider requiring NO API keys. Ingests Tickers, Orderbook, and Funding.
 """
 
-from typing import Dict, Any, List, Optional
-import httpx
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class BybitPublicClient:
     def __init__(self, timeout_seconds: float = 5.0) -> None:
         self.timeout = timeout_seconds
 
-    async def get_linear_ticker(self, symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def get_linear_ticker(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Fetch linear perpetual ticker data from Bybit v5."""
         url = f"{BYBIT_BASE_URL}/v5/market/tickers"
         params = {"category": "linear", "symbol": symbol.upper()}
@@ -37,10 +38,10 @@ class BybitPublicClient:
                 "volume_24h_usd": float(item.get("turnover24h", 0.0)),
                 "open_interest_usd": float(item.get("openInterestValue", 0.0)),
                 "funding_rate_8h": float(item.get("fundingRate", 0.0)),
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
 
-    async def get_orderbook(self, symbol: str = "BTCUSDT", limit: int = 50) -> Dict[str, Any]:
+    async def get_orderbook(self, symbol: str = "BTCUSDT", limit: int = 50) -> dict[str, Any]:
         """Fetch orderbook depth from Bybit v5."""
         url = f"{BYBIT_BASE_URL}/v5/market/orderbook"
         params = {"category": "linear", "symbol": symbol.upper(), "limit": limit}
@@ -54,5 +55,5 @@ class BybitPublicClient:
                 "symbol": symbol.upper(),
                 "bids": bids,
                 "asks": asks,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }

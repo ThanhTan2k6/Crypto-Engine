@@ -4,7 +4,6 @@ Anti-Hallucination Architectural Boundary Enforcement.
 """
 
 from pathlib import Path
-import pytest
 
 BANNED_IMPORTS = [
     "langchain",
@@ -31,4 +30,4 @@ def test_zero_llm_imports_in_quant_engine():
                 if banned in content:
                     violations.append(f"Banned import '{banned}' detected in {py_file}")
 
-    assert len(violations) == 0, f"Architectural Violation: LLM imports found in quant engine:\n" + "\n".join(violations)
+    assert len(violations) == 0, "Architectural Violation: LLM imports found in quant engine:\n" + "\n".join(violations)

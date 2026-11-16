@@ -3,10 +3,11 @@ Binance Public WebSocket & REST Client for CryptoIntel-Engine.
 Requires NO API keys. Ingests Real-Time Spot & Perpetual Futures Ticker, Depth, OI, and Funding.
 """
 
-from typing import Dict, Any, List, Optional
-import httpx
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class BinancePublicClient:
     def __init__(self, timeout_seconds: float = 5.0) -> None:
         self.timeout = timeout_seconds
 
-    async def get_futures_ticker_24h(self, symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def get_futures_ticker_24h(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Fetch 24h ticker price, volume, high, low from Binance Futures."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/ticker/24hr"
         params = {"symbol": symbol.upper()}
@@ -35,10 +36,10 @@ class BinancePublicClient:
                 "price_change_pct_24h": float(data.get("priceChangePercent", 0.0)),
                 "high_price_24h": float(data.get("highPrice", 0.0)),
                 "low_price_24h": float(data.get("lowPrice", 0.0)),
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
 
-    async def get_open_interest(self, symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def get_open_interest(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Fetch current open interest in USD and contracts."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/openInterest"
         params = {"symbol": symbol.upper()}
@@ -49,10 +50,10 @@ class BinancePublicClient:
             return {
                 "symbol": symbol.upper(),
                 "open_interest_contracts": float(data.get("openInterest", 0.0)),
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
 
-    async def get_funding_rate(self, symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def get_funding_rate(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Fetch latest funding rate and predicted next funding rate."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/fundingRate"
         params = {"symbol": symbol.upper(), "limit": 1}
@@ -61,18 +62,18 @@ class BinancePublicClient:
             resp.raise_for_status()
             data = resp.json()
             rate = 0.0
-            funding_time = datetime.utcnow()
+            funding_time = datetime.now(UTC)
             if data and len(data) > 0:
                 rate = float(data[0].get("fundingRate", 0.0))
-                funding_time = datetime.utcfromtimestamp(data[0].get("fundingTime", 0) / 1000.0)
+                funding_time = datetime.fromtimestamp(data[0].get("fundingTime", 0) / 1000.0, tz=UTC)
             return {
                 "symbol": symbol.upper(),
                 "funding_rate_8h": rate,
                 "funding_time": funding_time,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
 
-    async def get_orderbook_depth(self, symbol: str = "BTCUSDT", limit: int = 50) -> Dict[str, Any]:
+    async def get_orderbook_depth(self, symbol: str = "BTCUSDT", limit: int = 50) -> dict[str, Any]:
         """Fetch orderbook top bids and asks to calculate orderbook depth and imbalance."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/depth"
         params = {"symbol": symbol.upper(), "limit": limit}
@@ -86,5 +87,5 @@ class BinancePublicClient:
                 "symbol": symbol.upper(),
                 "bids": bids,
                 "asks": asks,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }

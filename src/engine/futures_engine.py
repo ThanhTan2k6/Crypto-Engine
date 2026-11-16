@@ -4,11 +4,9 @@ STRICT INVARIANT: PURE PYTHON / NUMPY / PANDAS ONLY. ZERO LLM IMPORTS ALLOWED.
 Calculates Annualized Funding APR, FRSI, OI Divergence, Orderbook Imbalance (OBIR), Liquidation Pockets.
 """
 
-from typing import Tuple, List, Dict, Any
-from datetime import datetime, timezone
-import numpy as np
+from datetime import UTC, datetime
 
-from src.ingestion.schemas import FuturesSqueezeSchema, FuturesRiskLevel
+from src.ingestion.schemas import FuturesRiskLevel, FuturesSqueezeSchema
 
 
 class FuturesRiskEngine:
@@ -43,7 +41,7 @@ class FuturesRiskEngine:
 
     @staticmethod
     def calculate_orderbook_imbalance_ratio(
-        bids: List[List[float]], asks: List[List[float]]
+        bids: list[list[float]], asks: list[list[float]]
     ) -> float:
         """
         Calculate Orderbook Imbalance Ratio (OBIR) within depth:
@@ -75,7 +73,7 @@ class FuturesRiskEngine:
     @staticmethod
     def estimate_liquidation_pockets(
         current_price: float, high_24h: float, low_24h: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Identify estimated stop-loss & high-leverage liquidation clusters:
         - Liquidation Pocket Above: 1.5% above 24h High (Short stop hunt zone)
@@ -93,14 +91,14 @@ class FuturesRiskEngine:
         oi_24h_ago: float,
         funding_rate_8h: float,
         long_short_ratio: float,
-        bids: List[List[float]],
-        asks: List[List[float]],
+        bids: list[list[float]],
+        asks: list[list[float]],
         high_24h: float,
         low_24h: float,
         timestamp: datetime | None = None,
     ) -> FuturesSqueezeSchema:
         """Execute full deterministic futures squeeze and liquidation risk evaluation."""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         funding_apr = self.annualize_funding_rate(funding_rate_8h)
         frsi = self.calculate_frsi(funding_apr)
         oi_change = self.calculate_oi_change_pct(open_interest_usd, oi_24h_ago)
