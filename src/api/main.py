@@ -128,9 +128,12 @@ async def get_realtime_metrics(symbol: str) -> dict[str, Any]:
     profile = get_symbol_market_profile(clean_symbol)
 
     engine = CoreQuantEngine()
+    current_px = profile["current_price"]
     audit_data = engine.run_full_quant_audit(
         symbol=clean_symbol,
-        current_price=profile["current_price"],
+        current_price=current_px,
+        high_24h=current_px * 1.02,
+        low_24h=current_px * 0.98,
         market_cap=profile["market_cap"],
         realized_cap=profile["realized_cap"],
         std_market_cap=profile["std_market_cap"],
@@ -167,9 +170,12 @@ async def analyze_crypto_setup(req: AuditRequest) -> dict[str, Any]:
     profile = get_symbol_market_profile(clean_symbol)
 
     engine = CoreQuantEngine()
+    current_px = profile["current_price"]
     quant_data = engine.run_full_quant_audit(
         symbol=clean_symbol,
-        current_price=profile["current_price"],
+        current_price=current_px,
+        high_24h=current_px * 1.02,
+        low_24h=current_px * 0.98,
         market_cap=profile["market_cap"],
         realized_cap=profile["realized_cap"],
         std_market_cap=profile["std_market_cap"],

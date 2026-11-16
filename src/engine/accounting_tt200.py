@@ -136,15 +136,17 @@ class TT200AccountingEngine:
         Record a buy or sell transaction and update ledger balances.
         Returns the transaction impact summary.
         """
-        self.transactions.append(tx)
         key = (tx.symbol.upper(), tx.account)
 
         if tx.action in [TransactionType.BUY, TransactionType.TRANSFER_IN]:
-            return self._handle_buy(tx, key)
+            res = self._handle_buy(tx, key)
         elif tx.action in [TransactionType.SELL, TransactionType.TRANSFER_OUT]:
-            return self._handle_sell(tx, key)
+            res = self._handle_sell(tx, key)
         else:
             raise ValueError(f"Unsupported transaction type: {tx.action}")
+
+        self.transactions.append(tx)
+        return res
 
     def _handle_buy(
         self, tx: CryptoTransaction, key: tuple[str, TT200AccountCode]
@@ -181,15 +183,26 @@ class TT200AccountingEngine:
     def _handle_sell(
         self, tx: CryptoTransaction, key: tuple[str, TT200AccountCode]
     ) -> dict[str, Any]:
-        proceeds = (tx.quantity * tx.price_usd) - tx.fee_usd
-        self.cash_balance_usd += proceeds
-
-        cost_of_goods_sold: float = 0.0
-
+        # Pre-validate inventory before mutating cash or ledger state
         if self.costing_method == InventoryCostMethod.FIFO:
+            lots = self._fifo_lots.get(key)
+            available_qty = sum(lot.quantity_remaining for lot in lots) if lots else 0.0
+            if available_qty < tx.quantity - 1e-9:
+                raise ValueError(
+                    f"Insufficient inventory to sell {tx.quantity} of {key[0]} in account {key[1]}; available: {available_qty}"
+                )
             cost_of_goods_sold = self._deplete_fifo(key, tx.quantity)
         else:
+            totals = self._moving_avg_totals.get(key)
+            available_qty = totals["qty"] if totals else 0.0
+            if available_qty < tx.quantity - 1e-9:
+                raise ValueError(
+                    f"Insufficient inventory to sell {tx.quantity} of {key[0]} in account {key[1]}; available: {available_qty}"
+                )
             cost_of_goods_sold = self._deplete_moving_average(key, tx.quantity)
+
+        proceeds = (tx.quantity * tx.price_usd) - tx.fee_usd
+        self.cash_balance_usd += proceeds
 
         realized_pnl = proceeds - cost_of_goods_sold
         self.cumulative_realized_pnl += realized_pnl
@@ -316,7 +329,7 @@ class TT200AccountingEngine:
                 )
             )
 
-        total_book = trading_book_val + strategic_book_val
+        total_book = sum(p.total_book_value_usd for p in positions)
         net_carrying = total_book - total_impairment
         nav = self.cash_balance_usd + total_market_val
 

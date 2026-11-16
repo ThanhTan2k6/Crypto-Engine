@@ -74,3 +74,26 @@ async def test_cache_ttl_expiry():
     await asyncio.sleep(1.1)
     res_after = await cache.get("short_lived", "key1")
     assert res_after is None
+
+
+@pytest.mark.asyncio
+async def test_cache_max_in_memory_eviction():
+    """Verify in-memory cache bounds memory by evicting oldest or expired entries."""
+    cache = AuditCacheManager(
+        default_ttl_seconds=60,
+        enable_in_memory_fallback=True,
+        max_in_memory_entries=3,
+    )
+
+    await cache.set("ns", "k1", {"val": 1})
+    await cache.set("ns", "k2", {"val": 2})
+    await cache.set("ns", "k3", {"val": 3})
+    assert cache.get_stats()["in_memory_entries"] == 3
+
+    # Adding a 4th entry should trigger eviction to enforce max_in_memory_entries
+    await cache.set("ns", "k4", {"val": 4})
+    assert cache.get_stats()["in_memory_entries"] <= 3
+
+    # Newest entry must exist
+    res_k4 = await cache.get("ns", "k4")
+    assert res_k4 is not None and res_k4["val"] == 4

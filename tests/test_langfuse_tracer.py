@@ -3,12 +3,16 @@ Unit Tests for Langfuse Observability & LLMOps Tracer.
 Verifies trace lifecycle recording, node spans, and graceful local degradation.
 """
 
+import pytest
+
 from src.llmops.langfuse_tracer import LangfuseAuditTracer
 
 
-def test_tracer_lifecycle_in_local_mode():
+def test_tracer_lifecycle_in_local_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify tracer records full multi-agent audit lifecycle without external dependencies."""
-    tracer = LangfuseAuditTracer(public_key=None, secret_key=None)
+    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+    tracer = LangfuseAuditTracer(public_key="", secret_key="")
     assert not tracer.is_enabled
 
     trace_id = "test_trace_123"

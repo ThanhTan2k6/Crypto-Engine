@@ -10,16 +10,44 @@ import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
 # Try importing redis; fallback to None if not installed
 try:
     import redis.asyncio as aioredis
+    from redis.exceptions import RedisError
 
     REDIS_ASYNC_MODULE: Any = aioredis
+    REDIS_EXCEPTION_CLASS: Any = RedisError
 except ImportError:
     REDIS_ASYNC_MODULE = None
+    REDIS_EXCEPTION_CLASS = None
+
+REDIS_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    RuntimeError,
+    ConnectionError,
+    TimeoutError,
+    ValueError,
+    OSError,
+)
+if REDIS_EXCEPTION_CLASS is not None:
+    REDIS_EXCEPTIONS = (*REDIS_EXCEPTIONS, REDIS_EXCEPTION_CLASS)
+
+
+def _sanitize_redis_url(url: str) -> str:
+    """Mask password credentials in Redis URL for safe logging."""
+    try:
+        parts = urlsplit(url)
+        if parts.password:
+            masked_netloc = f"{parts.username or ''}:***@{parts.hostname or ''}"
+            if parts.port:
+                masked_netloc += f":{parts.port}"
+            return parts._replace(netloc=masked_netloc).geturl()
+    except (ValueError, AttributeError):
+        return url
+    return url
 
 
 class AuditCacheManager:
@@ -33,10 +61,12 @@ class AuditCacheManager:
         redis_url: str | None = None,
         default_ttl_seconds: int = 300,
         enable_in_memory_fallback: bool = True,
+        max_in_memory_entries: int = 1000,
     ) -> None:
-        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        self.redis_url: str = redis_url or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
         self.default_ttl = default_ttl_seconds
         self.enable_fallback = enable_in_memory_fallback
+        self.max_in_memory_entries = max_in_memory_entries
 
         self._redis_client: Any = None
         self._redis_available: bool = False
@@ -53,11 +83,12 @@ class AuditCacheManager:
                     encoding="utf-8",
                     decode_responses=True,
                     socket_connect_timeout=1.0,
+                    socket_timeout=1.0,
                 )
                 await self._redis_client.ping()
                 self._redis_available = True
-                logger.info("Connected to Redis at %s", self.redis_url)
-            except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError) as e:
+                logger.info("Connected to Redis at %s", _sanitize_redis_url(self.redis_url))
+            except REDIS_EXCEPTIONS as e:
                 logger.warning(
                     "Redis connection failed (%s); operating with in-memory cache fallback.",
                     e,
@@ -99,7 +130,7 @@ class AuditCacheManager:
                 if cached_data is not None:
                     self._hits += 1
                     return json.loads(cached_data)  # type: ignore[no-any-return]
-            except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError) as e:
+            except REDIS_EXCEPTIONS as e:
                 logger.warning("Redis GET failed for %s: %s; checking in-memory fallback.", cache_key, e)
                 self._redis_available = False
 
@@ -136,13 +167,22 @@ class AuditCacheManager:
             try:
                 await self._redis_client.set(cache_key, serialized, ex=ttl)
                 success = True
-            except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError) as e:
+            except REDIS_EXCEPTIONS as e:
                 logger.warning("Redis SET failed for %s: %s; falling back to in-memory.", cache_key, e)
                 self._redis_available = False
 
         # 2. Store in In-memory fallback
         if self.enable_fallback:
-            self._in_memory_cache[cache_key] = (time.time() + ttl, serialized)
+            now = time.time()
+            if len(self._in_memory_cache) >= self.max_in_memory_entries:
+                expired = [k for k, (exp, _) in self._in_memory_cache.items() if now >= exp]
+                for k in expired:
+                    del self._in_memory_cache[k]
+                if len(self._in_memory_cache) >= self.max_in_memory_entries:
+                    oldest_key = next(iter(self._in_memory_cache))
+                    del self._in_memory_cache[oldest_key]
+
+            self._in_memory_cache[cache_key] = (now + ttl, serialized)
             success = True
 
         return success
@@ -153,7 +193,7 @@ class AuditCacheManager:
         if self._redis_available and self._redis_client is not None:
             try:
                 await self._redis_client.delete(cache_key)
-            except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError) as e:
+            except REDIS_EXCEPTIONS as e:
                 logger.warning("Redis DELETE failed for %s: %s", cache_key, e)
 
         if cache_key in self._in_memory_cache:
@@ -180,7 +220,7 @@ class AuditCacheManager:
                 keys = await self._redis_client.keys("cryptointel:*")
                 if keys:
                     await self._redis_client.delete(*keys)
-            except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError) as e:
+            except REDIS_EXCEPTIONS as e:
                 logger.warning("Failed to flush Redis keys: %s", e)
 
 

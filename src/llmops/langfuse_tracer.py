@@ -77,6 +77,8 @@ class LangfuseAuditTracer:
             "status": "RUNNING",
         }
         self._in_memory_traces.append(trace_record)
+        if len(self._in_memory_traces) > 500:
+            self._in_memory_traces = self._in_memory_traces[-500:]
 
         if self._is_enabled and self._client:
             try:

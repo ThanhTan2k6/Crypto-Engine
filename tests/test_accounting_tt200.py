@@ -188,6 +188,7 @@ def test_tt200_insufficient_inventory_raises_error():
         )
     )
 
+    initial_cash = engine.cash_balance_usd
     with pytest.raises(ValueError, match="Insufficient inventory"):
         engine.record_transaction(
             CryptoTransaction(
@@ -200,3 +201,7 @@ def test_tt200_insufficient_inventory_raises_error():
                 price_usd=160.0,
             )
         )
+
+    # Cash balance and transaction history must remain untainted on failure
+    assert engine.cash_balance_usd == initial_cash
+    assert len(engine.transactions) == 1

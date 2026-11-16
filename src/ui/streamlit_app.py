@@ -193,7 +193,7 @@ with tab_futures:
     with fc1:
         st.metric(
             "Funding Rate (8h)",
-            f"{futures_data.funding_rate_8h * 100:.3f}%",
+            f"{futures_data.current_funding_rate * 100:.3f}%",
             f"APR: {futures_data.annualized_funding_rate:.1f}%",
         )
     with fc2:
@@ -232,12 +232,13 @@ with tab_accounting:
     st.subheader("📚 Bảng Cân Đối & Trích Lập Dự Phòng (Thông tư 200/2014/TT-BTC)")
     st.caption("Quản trị danh mục có kiểm toán: Phân tách Realized PnL (TK 515/635) vs Unrealized PnL (TK 412).")
 
-    # Evaluate current ledger
+    # Evaluate current ledger with accurate mark prices
     prices = {
-        "BTCUSDT": spot_data.current_price if "BTC" in symbol else 95000.0,
-        "ETHUSDT": spot_data.current_price if "ETH" in symbol else 3400.0,
-        "SOLUSDT": spot_data.current_price if "SOL" in symbol else 185.0,
+        "BTCUSDT": get_symbol_market_profile("BTCUSDT")["current_price"],
+        "ETHUSDT": get_symbol_market_profile("ETHUSDT")["current_price"],
+        "SOLUSDT": get_symbol_market_profile("SOLUSDT")["current_price"],
     }
+    prices[symbol] = spot_data.current_price
     balance_sheet = accounting_ledger.evaluate_portfolio(prices)
 
     bc1, bc2, bc3, bc4 = st.columns(4)
@@ -290,7 +291,8 @@ with tab_accounting:
         f_acc = st.selectbox("Tài khoản kế toán", ["TK_121 (Lướt sóng)", "TK_228 (Ví lạnh tích sản)"])
         f_action = st.selectbox("Loại giao dịch", ["BUY", "SELL"])
         f_qty = st.number_input("Số lượng", min_value=0.0001, value=0.5, step=0.01)
-        f_price = st.number_input("Đơn giá khớp lệnh ($)", min_value=0.1, value=spot_data.current_price)
+        default_price = get_symbol_market_profile(f_symbol)["current_price"]
+        f_price = st.number_input("Đơn giá khớp lệnh ($)", min_value=0.1, value=default_price)
         f_fee = st.number_input("Phí giao dịch ($)", min_value=0.0, value=5.0)
         submitted = st.form_submit_button("Hạch Toán Giao Dịch")
 
