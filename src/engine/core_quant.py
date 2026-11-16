@@ -38,8 +38,8 @@ class CoreQuantEngine:
         oi_24h_ago: float,
         funding_rate_8h: float,
         long_short_ratio: float,
-        bids: list,
-        asks: list,
+        bids: list[list[float]],
+        asks: list[list[float]],
         high_24h: float,
         low_24h: float,
         # Whale params
