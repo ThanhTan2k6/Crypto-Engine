@@ -9,10 +9,6 @@ import sys
 from datetime import UTC, datetime
 
 from dotenv import load_dotenv
-
-# Automatically load environment variables from .env
-load_dotenv()
-
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -20,6 +16,9 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
+
+# Automatically load environment variables from .env
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
