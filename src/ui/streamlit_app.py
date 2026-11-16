@@ -1,16 +1,22 @@
 """
 Streamlit Web Dashboard for CryptoIntel-Engine.
-Visualizes Mode Spot (Cycle Valuation & DCA Targets), Mode Futures (Leverage Squeeze & Liquidation Clusters),
-Multi-Agent Socratic Risk Audit, and Circular 200/2014/TT-BTC Accounting & Impairment Balance Sheet.
+Simplified, clean, and professional FinTech Decision-Support Copilot.
+Features:
+- Socratic Devil's Advocate Anti-FOMO Traffic Light Verdict
+- Algorithmic Spot DCA Accumulation & Take-Profit Targets
+- Real-time Futures Leverage Squeeze & Liquidation Pocket Visuals
+- Vietnamese Circular 200/2014/TT-BTC Accounting & Impairment Balance Sheet
 """
 
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 import plotly.graph_objects as go
 import streamlit as st
 
 from src.agents.graph import run_crypto_audit
+from src.agents.state import CryptoIntelState
 from src.api.main import accounting_ledger
 from src.engine.accounting_tt200 import (
     CryptoTransaction,
@@ -19,44 +25,124 @@ from src.engine.accounting_tt200 import (
 )
 from src.engine.core_quant import CoreQuantEngine, get_symbol_market_profile
 
+# Page Configuration
 st.set_page_config(
-    page_title="CryptoIntel-Engine | Decision Support Copilot",
+    page_title="CryptoIntel-Engine | Trợ Lý Thẩm Định Rủi Ro & Chống FOMO",
     page_icon="🛡️",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-st.title("🛡️ CryptoIntel-Engine: Market Intelligence & Socratic Risk Audit")
-st.caption(
-    "Dual-Engine Spot Cycle Valuation, Real-time Futures Leverage Squeeze & Socratic Devil's Advocate Copilot"
+# Custom Styling for Professional FinTech Look
+st.markdown(
+    """
+    <style>
+    /* Global Typography & Background */
+    .block-container {
+        padding-top: 1.8rem;
+        padding-bottom: 2.5rem;
+    }
+    /* Brand Header */
+    .brand-header {
+        background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 20px;
+    }
+    .brand-title {
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #f9fafb;
+        margin: 0;
+    }
+    .brand-subtitle {
+        font-size: 0.95rem;
+        color: #9ca3af;
+        margin-top: 4px;
+        margin-bottom: 0;
+    }
+    /* Metric Cards */
+    .ci-card {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    .ci-card-title {
+        font-size: 0.82rem;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+    .ci-card-value {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #f3f4f6;
+    }
+    .ci-card-sub {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+    /* Traffic Light Banners */
+    .verdict-red {
+        background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(153, 27, 27, 0.25) 100%);
+        border: 1px solid #ef4444;
+        border-radius: 10px;
+        padding: 16px 20px;
+        color: #fca5a5;
+        margin-bottom: 16px;
+    }
+    .verdict-yellow {
+        background: linear-gradient(135deg, rgba(217, 119, 6, 0.15) 0%, rgba(180, 83, 9, 0.25) 100%);
+        border: 1px solid #f59e0b;
+        border-radius: 10px;
+        padding: 16px 20px;
+        color: #fde68a;
+        margin-bottom: 16px;
+    }
+    .verdict-green {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(4, 120, 87, 0.25) 100%);
+        border: 1px solid #10b981;
+        border-radius: 10px;
+        padding: 16px 20px;
+        color: #a7f3d0;
+        margin-bottom: 16px;
+    }
+    .socratic-card {
+        background: rgba(30, 41, 59, 0.5);
+        border-left: 4px solid #38bdf8;
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 12px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-# Sidebar controls
-st.sidebar.header("🎯 Target Asset & Mode Selection")
-symbol_input = st.sidebar.text_input("Asset Symbol", value="BTC").upper()
-symbol = symbol_input.replace("USDT", "") + "USDT"
 
-analysis_mode = st.sidebar.radio(
-    "Execution Mode",
-    options=["DUAL_AUDIT", "MODE_SPOT", "MODE_FUTURES"],
-)
-
-proposed_trade = st.sidebar.text_input("Proposed Trade Setup (Optional)", value="BUY_SPOT_DCA")
-proposed_entry_input = st.sidebar.number_input(
-    "Proposed Entry Price ($)", min_value=0.0, value=0.0, step=100.0
-)
-time_horizon = st.sidebar.slider("Investment Horizon (Days)", min_value=1, max_value=365, value=30)
-
-run_audit_btn = st.sidebar.button("🚀 Chạy Thẩm định Rủi ro", type="primary")
-
-# Execute audit when requested
-if run_audit_btn:
+def perform_quant_and_audit(
+    symbol: str,
+    analysis_mode: str,
+    proposed_trade: str,
+    proposed_entry: float,
+    time_horizon: int,
+) -> tuple[dict[str, Any], CryptoIntelState, dict[str, Any]]:
+    """Helper to compute deterministic quant and multi-agent audit."""
     profile = get_symbol_market_profile(symbol)
-    entry_price = proposed_entry_input if proposed_entry_input > 0.0 else profile["current_price"]
+    entry_price = proposed_entry if proposed_entry > 0.0 else profile["current_price"]
 
     engine = CoreQuantEngine()
+    current_px = profile["current_price"]
     quant_audit = engine.run_full_quant_audit(
         symbol=symbol,
-        current_price=profile["current_price"],
+        current_price=current_px,
+        high_24h=current_px * 1.02,
+        low_24h=current_px * 0.98,
         market_cap=profile["market_cap"],
         realized_cap=profile["realized_cap"],
         std_market_cap=profile["std_market_cap"],
@@ -83,222 +169,388 @@ if run_audit_btn:
         "next_unlock_pct_of_circulating", 0.0
     )
 
-    with st.spinner(f"Hội đồng AI đang thẩm định {symbol}..."):
-        audit_state = asyncio.run(
-            run_crypto_audit(
-                symbol=symbol,
-                execution_mode=analysis_mode,
-                spot_valuation_data=spot_dict,
-                futures_squeeze_data=futures_dict,
-                whale_flow_data=whale_dict,
-                etf_flow_data=etf_dict,
-                token_vesting_data=vesting_dict,
-                proposed_action=proposed_trade,
-                proposed_entry=entry_price,
-                time_horizon_days=time_horizon,
-            )
+    audit_state = asyncio.run(
+        run_crypto_audit(
+            symbol=symbol,
+            execution_mode=analysis_mode,
+            spot_valuation_data=spot_dict,
+            futures_squeeze_data=futures_dict,
+            whale_flow_data=whale_dict,
+            etf_flow_data=etf_dict,
+            token_vesting_data=vesting_dict,
+            proposed_action=proposed_trade,
+            proposed_entry=entry_price,
+            time_horizon_days=time_horizon,
         )
-
-    st.session_state["quant_audit"] = quant_audit
-    st.session_state["audit_state"] = audit_state
-    st.session_state["profile"] = profile
-
-if "audit_state" not in st.session_state:
-    st.info(
-        "👋 **Chào mừng bạn đến với CryptoIntel-Engine!**\n\n"
-        "Hệ thống thẩm định độc lập kết hợp toán học lượng hóa không ảo giác (Zero LLM Arithmetic) "
-        "và hội đồng tác tử phản biện Socratic Devil's Advocate.\n\n"
-        "👉 *Vui lòng chọn tài sản ở menu bên trái và nhấn **🚀 Chạy Thẩm định Rủi ro** để bắt đầu.*"
     )
-    st.stop()
+    return quant_audit, audit_state, profile
+
+
+# --- Top Brand Header ---
+st.markdown(
+    """
+    <div class="brand-header">
+        <div class="brand-title">🛡️ CryptoIntel-Engine | Trợ Lý Thẩm Định Rủi Ro & Chống FOMO</div>
+        <div class="brand-subtitle">
+            Toán học định lượng không ảo giác (Zero LLM Arithmetic) • Phản biện Socratic Devil's Advocate • Quản trị danh mục Thông tư 200
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- Control Panel (Sidebar) ---
+st.sidebar.markdown("### ⚙️ Thiết Lập Thẩm Định")
+
+preset_symbol = st.sidebar.selectbox(
+    "1. Chọn tài sản cần phân tích",
+    options=["BTCUSDT (Bitcoin)", "ETHUSDT (Ethereum)", "SOLUSDT (Solana)", "Tùy chọn khác..."],
+    index=0,
+)
+
+if "Tùy chọn khác" in preset_symbol:
+    custom_input = st.sidebar.text_input("Nhập mã token (ví dụ: BNB, AVAX)", value="BNB").upper()
+    selected_symbol = custom_input.replace("USDT", "") + "USDT"
+else:
+    selected_symbol = preset_symbol.split(" ")[0]
+
+proposed_intent = st.sidebar.selectbox(
+    "2. Kế hoạch / Tâm lý dự định vào lệnh",
+    options=[
+        "BUY_SPOT_DCA (Mua tích sản dài hạn)",
+        "BUY_BREAKOUT (Mua đuổi theo nến tăng)",
+        "LONG_LEVERAGE (Mở Long đòn bẩy)",
+        "SHORT_HEDGE (Mở Short phòng hộ / lướt sóng)",
+        "TAKE_PROFIT (Chốt lời từng phần)",
+    ],
+    index=0,
+)
+action_code = proposed_intent.split(" ")[0]
+
+entry_override = st.sidebar.number_input(
+    "3. Mức giá dự kiến khớp lệnh ($) (0 = Dùng giá thị trường)",
+    min_value=0.0,
+    value=0.0,
+    step=50.0,
+)
+
+mode_choice = st.sidebar.radio(
+    "4. Chế độ phân tích",
+    options=["DUAL_AUDIT (Toàn diện Spot + Futures)", "MODE_SPOT (Tập trung Tích sản)", "MODE_FUTURES (Tập trung Đòn bẩy)"],
+    index=0,
+)
+exec_mode = mode_choice.split(" ")[0]
+
+run_button = st.sidebar.button("🚀 Chạy Thẩm Định Lại", type="primary", use_container_width=True)
+
+# Auto-initialize session state if first visit or symbol changed
+if "quant_audit" not in st.session_state or run_button:
+    with st.spinner(f"Đang tính toán định lượng và chất vấn rủi ro cho {selected_symbol}..."):
+        q_audit, a_state, prof = perform_quant_and_audit(
+            symbol=selected_symbol,
+            analysis_mode=exec_mode,
+            proposed_trade=action_code,
+            proposed_entry=entry_override,
+            time_horizon=30,
+        )
+        st.session_state["quant_audit"] = q_audit
+        st.session_state["audit_state"] = a_state
+        st.session_state["profile"] = prof
+        st.session_state["active_symbol"] = selected_symbol
 
 quant_audit = st.session_state["quant_audit"]
 audit_state = st.session_state["audit_state"]
-profile = st.session_state.get("profile", {})
+profile = st.session_state["profile"]
+active_symbol = st.session_state.get("active_symbol", selected_symbol)
+
 spot_data = quant_audit["spot"]
 futures_data = quant_audit["futures"]
 whale_data = quant_audit["whale"]
 
-if not profile.get("is_calibrated", True):
-    st.warning("⚠️ **Ghi chú:** Đang sử dụng mô hình tham chiếu chuẩn hóa cho tài sản này.")
+# --- Traffic Light Hero Verdict ---
+verdict = audit_state.get("anti_fomo_verdict", "PROCEED_WITH_CAUTION")
+fomo_score = float(audit_state.get("fomo_index", 50.0))
+invalidation_px = float(audit_state.get("worst_case_invalidation_price", spot_data.current_price * 0.95))
 
-tab_overview, tab_spot, tab_futures, tab_accounting = st.tabs([
-    "🏛️ Socratic Audit & Verdict",
-    "📈 Mode Spot (Cycle DCA)",
-    "⚡ Mode Futures (Leverage Risk)",
-    "📚 Bảng Cân Đối TT 200/2014/TT-BTC",
+if verdict == "REJECT_SETUP_TOO_RISKY":
+    st.markdown(
+        f"""
+        <div class="verdict-red">
+            <h3 style="margin: 0 0 6px 0; color: #ef4444;">🔴 CẢNH BÁO ĐỎ: TỪ CHỐI SETUP - RỦI RO CỰC KỲ CAO</h3>
+            <b>Kết luận thẩm định:</b> Thị trường đang ở trạng thái rủi ro bất cân xứng (FOMO Index: {fomo_score:.1f}/100).
+            Tuyệt đối KHÔNG nên mở vị thế mua đuổi hoặc Long đòn bẩy ở vùng giá này do nguy cơ quét bẫy thanh lý hoặc điều chỉnh chu kỳ.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+elif verdict == "SCALE_IN_SPOT":
+    st.markdown(
+        f"""
+        <div class="verdict-green">
+            <h3 style="margin: 0 0 6px 0; color: #10b981;">🟢 TÍN HIỆU XANH: VÙNG TÍCH SẢN TỐT - CHIA VỐN MUA GOM</h3>
+            <b>Kết luận thẩm định:</b> Định giá tài sản đang ở vùng tích lũy an toàn của chu kỳ (FOMO Index: {fomo_score:.1f}/100).
+            Phù hợp kế hoạch mua gom chia làm nhiều đợt (DCA). Tránh tất tay (All-in) trong một lệnh đơn lẻ.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"""
+        <div class="verdict-yellow">
+            <h3 style="margin: 0 0 6px 0; color: #f59e0b;">🟡 CẢNH BÁO VÀNG: THẬN TRỌNG - CHỈ ĐI VỐN THĂM DÒ (10-20%)</h3>
+            <b>Kết luận thẩm định:</b> Tín hiệu thị trường đang giằng co và có rủi ro quét râu dừng lỗ (FOMO Index: {fomo_score:.1f}/100).
+            Nếu giải ngân, chỉ phân bổ tỷ trọng nhỏ, đặt dừng lỗ chặt chẽ tại vùng vô hiệu hóa kịch bản.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Quick Metrics Row
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.metric(f"Giá Thị Trường ({active_symbol})", f"${spot_data.current_price:,.2f}")
+with m2:
+    st.metric(
+        "Chỉ Số FOMO Index",
+        f"{fomo_score:.1f} / 100",
+        help="0-30: Vùng sợ hãi/mua an toàn | 31-70: Thận trọng | 71-100: Hưng phấn cực độ (Cấm fomo)",
+    )
+with m3:
+    st.metric(
+        "Chu Kỳ Định Giá",
+        spot_data.cycle_regime.value.replace("_", " "),
+        help="Xác định dựa trên MVRV Z-Score và Mayer Multiple",
+    )
+with m4:
+    inv_str = f"${invalidation_px:,.2f}" if invalidation_px >= 1.0 else f"${invalidation_px:,.6f}"
+    st.metric(
+        "Vùng Dừng Lỗ Kịch Bản",
+        inv_str,
+        help="Mức giá vô hiệu hóa kịch bản tồi tệ nhất nếu giá quét râu",
+    )
+
+st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+# --- 4 Main Clean Tabs ---
+tab_socratic, tab_spot, tab_futures, tab_accounting = st.tabs([
+    "🛡️ 1. Phản Biện Chống Đu Đỉnh (Socratic Audit)",
+    "🎯 2. Kế Hoạch Mua Gom & Chốt Lời (DCA & TP)",
+    "⚡ 3. Rủi Ro Đòn Bẩy & Thanh Lý (Futures)",
+    "💼 4. Quản Trị Danh Mục (Thông Tư 200)",
 ])
 
-with tab_overview:
-    st.subheader(f"🔍 Multi-Agent Audit Summary for {symbol}")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Price (USD)", f"${spot_data.current_price:,.2f}")
-    with col2:
-        st.metric("Cycle Regime", spot_data.cycle_regime.value)
-    with col3:
-        st.metric(
-            "Futures Risk",
-            futures_data.futures_risk_level.value,
-            f"APR {futures_data.annualized_funding_rate:.1f}%",
-        )
-    with col4:
-        st.metric(
-            "Anti-FOMO Verdict",
-            audit_state["anti_fomo_verdict"],
-            f"FOMO {audit_state['fomo_index']}/100",
-        )
+# ==================== TAB 1: SOCRATIC AUDIT ====================
+with tab_socratic:
+    st.markdown("#### 🗣️ 3 Câu Hỏi Chất Vấn Chí Mạng Của Biện Lý Socratic (Devil's Advocate)")
+    st.caption("Hãy tự trả lời trung thực 3 câu hỏi dưới đây trước khi bạn bấm nút Mua/Bán trên sàn giao dịch.")
 
-    st.markdown("---")
-    st.markdown("### 🗣️ Socratic Devil's Advocate - 3 Fatal Cross-Examinations")
-    for idx, q in enumerate(audit_state.get("fatal_socratic_questions", []), 1):
-        st.warning(f"⚠️ **Câu hỏi {idx}:** {q}")
+    fatal_questions = audit_state.get("fatal_socratic_questions", [])
+    if fatal_questions:
+        for idx, q in enumerate(fatal_questions, 1):
+            st.markdown(
+                f"""
+                <div class="socratic-card">
+                    <b style="color: #38bdf8;">❓ Câu hỏi chất vấn {idx}:</b><br/>
+                    <span style="font-size: 1.02rem; color: #e2e8f0;">{q}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("Chưa ghi nhận câu hỏi phản biện cho kịch bản hiện tại.")
 
-    price_str = (
-        f"${audit_state['worst_case_invalidation_price']:,.2f}"
-        if audit_state["worst_case_invalidation_price"] >= 1.0
-        else f"${audit_state['worst_case_invalidation_price']:,.6f}"
-    )
-    st.markdown(
-        f"🛑 **Mức giá Vô hiệu hóa Tồi tệ nhất (Worst-Case Invalidation):** `{price_str}`"
-    )
+    st.markdown("#### 🚫 Luận Điểm Phản Bác & Cảnh Báo Tâm Lý")
+    refutations = audit_state.get("thesis_refutations", [])
+    if refutations:
+        for r in refutations:
+            st.markdown(f"• ⚠️ **Lưu ý rủi ro:** {r}")
+    else:
+        st.write("Không phát hiện tín hiệu bất thường nghiêm trọng.")
 
-    st.markdown("### 🛡️ Luận Điểm Phản Bác Trọng Tâm")
-    for refutation in audit_state.get("thesis_refutations", []):
-        st.markdown(f"- 🔴 {refutation}")
-
+# ==================== TAB 2: SPOT DCA & TP ====================
 with tab_spot:
-    st.subheader(f"📊 Spot Accumulation & Cycle Valuation ({symbol})")
-    sc1, sc2, sc3 = st.columns(3)
-    with sc1:
-        st.metric("MVRV Z-Score", f"{spot_data.mvrv_zscore:.2f}", "Fair Value [0.1 - 5.0]")
-    with sc2:
-        st.metric("Mayer Multiple", f"{spot_data.mayer_multiple:.2f}", "200-Day SMA Benchmark")
-    with sc3:
-        st.metric("Pi Cycle Top Alert", "TRIGGERED" if spot_data.pi_cycle_top_triggered else "NORMAL")
+    st.markdown(f"#### 🎯 Chiến Lược Tích Sản & Phân Bổ Vốn ({active_symbol})")
+    st.caption("Các vùng giá được toán học định lượng tính sẵn dựa trên 200W-MA và Realized Price sàn chu kỳ.")
 
-    st.markdown("#### 🎯 Algorithmic DCA Accumulation Zones")
-    st.info(f"🔹 **Zone 1 (Conservative -8%):** ${spot_data.dca_zone_conservative:,.2f}")
-    st.info(f"🔹 **Zone 2 (Moderate / Realized Floor):** ${spot_data.dca_zone_moderate:,.2f}")
-    st.info(f"🔹 **Zone 3 (Aggressive / 200W-MA Floor):** ${spot_data.dca_zone_aggressive:,.2f}")
+    col_dca, col_tp = st.columns(2)
 
-    st.markdown("#### 💰 Algorithmic Take-Profit Targets")
-    st.success(f"🟢 **TP 1 (+35% Initial De-risk):** ${spot_data.take_profit_target_1:,.2f}")
-    st.success(f"🟢 **TP 2 (+75% Mid-Cycle Expansion):** ${spot_data.take_profit_target_2:,.2f}")
-    st.success(f"🟢 **TP 3 (+150% Cycle Top Euphoria):** ${spot_data.take_profit_target_3:,.2f}")
+    with col_dca:
+        st.markdown("##### 📥 Vùng Giá Mua Gom (DCA Accumulation)")
+        st.info(
+            f"🔹 **Vùng 1 (Thận trọng - Tỷ trọng 25%):**  \n"
+            f"**${spot_data.dca_zone_conservative:,.2f}**  \n"
+            f"*(Chiết khấu -8% từ giá thị trường, phù hợp đặt lệnh Limit đầu tiên)*"
+        )
+        st.info(
+            f"🔹 **Vùng 2 (Vừa phải - Tỷ trọng 35%):**  \n"
+            f"**${spot_data.dca_zone_moderate:,.2f}**  \n"
+            f"*(Vùng giá vốn Realized Price của toàn mạng lưới)*"
+        )
+        st.info(
+            f"🔹 **Vùng 3 (Bắt đáy chu kỳ - Tỷ trọng 40%):**  \n"
+            f"**${spot_data.dca_zone_aggressive:,.2f}**  \n"
+            f"*(Vùng sàn lịch sử 200-Tuần MA - Vùng gom tối ưu nhất)*"
+        )
 
+    with col_tp:
+        st.markdown("##### 💰 Vùng Giá Chốt Lời Từng Phần (Take Profit)")
+        st.success(
+            f"🟢 **Mục tiêu 1 (+35% Lợi nhuận):**  \n"
+            f"**${spot_data.take_profit_target_1:,.2f}**  \n"
+            f"*(Thu hồi vốn ban đầu để đưa tài khoản về thế an toàn)*"
+        )
+        st.success(
+            f"🟢 **Mục tiêu 2 (+75% Lợi nhuận):**  \n"
+            f"**${spot_data.take_profit_target_2:,.2f}**  \n"
+            f"*(Chốt lời giai đoạn tăng trưởng mở rộng chu kỳ)*"
+        )
+        st.success(
+            f"🟢 **Mục tiêu 3 (+150% Lợi nhuận):**  \n"
+            f"**${spot_data.take_profit_target_3:,.2f}**  \n"
+            f"*(Chốt lời đỉnh hưng phấn chu kỳ - Tuyệt đối không giữ thêm)*"
+        )
+
+# ==================== TAB 3: FUTURES & LEVERAGE ====================
 with tab_futures:
-    st.subheader(f"⚡ Derivatives Leverage & Liquidation Risk ({symbol})")
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1:
+    st.markdown(f"#### ⚡ Áp Lực Đòn Bẩy & Cụm Dừng Lỗ Thanh Lý ({active_symbol})")
+
+    f1, f2, f3 = st.columns(3)
+    with f1:
         st.metric(
             "Funding Rate (8h)",
-            f"{futures_data.current_funding_rate * 100:.3f}%",
+            f"{futures_data.current_funding_rate * 100:.4f}%",
             f"APR: {futures_data.annualized_funding_rate:.1f}%",
         )
-    with fc2:
-        st.metric("FRSI Score (0-100)", f"{futures_data.frsi_score:.1f}")
-    with fc3:
-        st.metric("Orderbook Imbalance (±2%)", f"{futures_data.orderbook_imbalance_ratio:.2f}")
+    with f2:
+        st.metric(
+            "FRSI Score (0-100)",
+            f"{futures_data.frsi_score:.1f}",
+            help="> 75: Quá nóng (nguy cơ bẫy Long) | < 25: Quá nguội (nguy cơ Short squeeze)",
+        )
+    with f3:
+        st.metric(
+            "Mất Cân Đối Sổ Lệnh (±2%)",
+            f"{futures_data.orderbook_imbalance_ratio:.2f}",
+            help="Tỷ lệ thanh khoản Bid / (Bid + Ask) trong biên độ 2%",
+        )
 
-    # Plotly Liquidation Pocket Chart
+    # Plotly Liquidation Chart
     fig = go.Figure()
     curr_p = futures_data.current_price
     fig.add_trace(
         go.Bar(
-            name="Liquidation Risk Bands",
-            x=["Liquidation Below (Long Stop)", "Current Price", "Liquidation Above (Short Stop)"],
+            name="Biên Độ Thanh Lý",
+            x=["Quét Dừng Lỗ Long (Bên Dưới)", "Giá Thị Trường Hiện Tại", "Quét Dừng Lỗ Short (Bên Trên)"],
             y=[futures_data.liquidation_pocket_below, curr_p, futures_data.liquidation_pocket_above],
-            marker_color=["#2ecc71", "#3498db", "#e74c3c"],
+            text=[
+                f"${futures_data.liquidation_pocket_below:,.1f}",
+                f"${curr_p:,.1f}",
+                f"${futures_data.liquidation_pocket_above:,.1f}",
+            ],
+            textposition="auto",
+            marker_color=["#10b981", "#3b82f6", "#ef4444"],
         )
     )
     fig.update_layout(
-        title=f"Bản Đồ Cụm Thanh Lý & Biên Độ Rủi Ro Đòn Bẩy ({symbol})",
-        yaxis_title="Price (USD)",
+        title=f"Bản Đồ Cụm Thanh Lý & Biên Độ Quét Râu Đòn Bẩy ({active_symbol})",
+        yaxis_title="Đơn Giá (USD)",
         template="plotly_dark",
-        height=380,
+        height=360,
+        margin={"l": 40, "r": 40, "t": 50, "b": 40},
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("#### 🎯 Estimated High-Leverage Liquidation Clusters")
-    st.error(
-        f"🔴 **Short Liquidation Pocket Above (+1.5% 24h High):** ${futures_data.liquidation_pocket_above:,.2f}"
-    )
-    st.error(
-        f"🟢 **Long Stop Sweep Pocket Below (-2.0% 24h Low):** ${futures_data.liquidation_pocket_below:,.2f}"
-    )
+    c_box1, c_box2 = st.columns(2)
+    with c_box1:
+        st.error(
+            f"🔴 **Vùng Quét Stop-loss Short (Bên Trên):** ${futures_data.liquidation_pocket_above:,.2f}  \n"
+            f"*Nếu mở vị thế Short, đặt điểm dừng lỗ an toàn cao hơn mức này để tránh bị quét râu.*"
+        )
+    with c_box2:
+        st.error(
+            f"🟢 **Vùng Quét Stop-loss Long (Bên Dưới):** ${futures_data.liquidation_pocket_below:,.2f}  \n"
+            f"*Nếu mở vị thế Long, đặt điểm dừng lỗ sâu hơn mức này để không bị sàn săn thanh khoản.*"
+        )
 
+# ==================== TAB 4: TT 200 ACCOUNTING ====================
 with tab_accounting:
-    st.subheader("📚 Bảng Cân Đối & Trích Lập Dự Phòng (Thông tư 200/2014/TT-BTC)")
-    st.caption("Quản trị danh mục có kiểm toán: Phân tách Realized PnL (TK 515/635) vs Unrealized PnL (TK 412).")
+    st.markdown("#### 📚 Bảng Cân Đối Danh Mục Theo Thông Tư 200/2014/TT-BTC")
+    st.caption("Quản trị tài sản số chuyên nghiệp: Tách bạch rõ Lãi/Lỗ đã chốt (TK 515/635) và Quỹ dự phòng giảm giá (TK 2291).")
 
-    # Evaluate current ledger with accurate mark prices
+    # Evaluate current ledger
     prices = {
         "BTCUSDT": get_symbol_market_profile("BTCUSDT")["current_price"],
         "ETHUSDT": get_symbol_market_profile("ETHUSDT")["current_price"],
         "SOLUSDT": get_symbol_market_profile("SOLUSDT")["current_price"],
     }
-    prices[symbol] = spot_data.current_price
+    prices[active_symbol] = spot_data.current_price
     balance_sheet = accounting_ledger.evaluate_portfolio(prices)
 
-    bc1, bc2, bc3, bc4 = st.columns(4)
-    with bc1:
-        st.metric("Tiền gửi & Tương đương (TK 112)", f"${balance_sheet.cash_balance_usd:,.2f}")
-    with bc2:
-        st.metric("Tài sản kinh doanh (TK 121)", f"${balance_sheet.trading_assets_book_value_usd:,.2f}")
-    with bc3:
-        st.metric("Đầu tư dài hạn ví lạnh (TK 228)", f"${balance_sheet.strategic_assets_book_value_usd:,.2f}")
-    with bc4:
+    a1, a2, a3, a4 = st.columns(4)
+    with a1:
+        st.metric("Tiền Gửi Khả Dụng (TK 112)", f"${balance_sheet.cash_balance_usd:,.2f}")
+    with a2:
+        st.metric("Tài Sản Lướt Sóng (TK 121)", f"${balance_sheet.trading_assets_book_value_usd:,.2f}")
+    with a3:
+        st.metric("Tài Sản Ví Lạnh (TK 228)", f"${balance_sheet.strategic_assets_book_value_usd:,.2f}")
+    with a4:
         st.metric(
-            "Dự phòng giảm giá (TK 2291)",
+            "Dự Phòng Giảm Giá (TK 2291)",
             f"${balance_sheet.total_impairment_provision_usd:,.2f}",
-            help="Trích lập dự phòng khi Giá thị trường < Giá gốc ghi sổ",
+            help="Trích lập dự phòng theo TT 200: max(0, Giá trị ghi sổ - Giá trị thị trường)",
         )
 
-    pnl1, pnl2, pnl3 = st.columns(3)
-    with pnl1:
+    r1, r2, r3 = st.columns(3)
+    with r1:
         st.metric("Lãi/Lỗ Đã Thực Hiện (TK 515/635)", f"${balance_sheet.cumulative_realized_pnl_usd:,.2f}")
-    with pnl2:
-        st.metric("Chênh lệch Đánh giá lại (TK 412)", f"${balance_sheet.unrealized_revaluation_usd:,.2f}")
-    with pnl3:
-        st.metric("Tổng Giá Trị Tài Sản Ròng (NAV)", f"${balance_sheet.net_asset_value_usd:,.2f}")
+    with r2:
+        st.metric("Chênh Lệch Đánh Giá Lại (TK 412)", f"${balance_sheet.unrealized_revaluation_usd:,.2f}")
+    with r3:
+        st.metric("Tổng Tài Sản Ròng (NAV)", f"${balance_sheet.net_asset_value_usd:,.2f}")
 
-    st.markdown("#### 📋 Chi Tiết Danh Mục & Trạng Thái Trích Lập Dự Phòng (Impairment)")
+    st.markdown("##### 📋 Chi Tiết Danh Mục Đầu Tư")
     table_rows = []
     for pos in balance_sheet.positions:
         table_rows.append({
             "Tài sản": pos.symbol,
-            "Tài khoản TT200": pos.account.value,
+            "Tài khoản TT 200": "TK 121 (Lướt sóng)" if pos.account == TT200AccountCode.TK_121 else "TK 228 (Ví lạnh)",
             "Số lượng": f"{pos.total_quantity:.4f}",
-            "Giá gốc bình quân": f"${pos.average_unit_cost_usd:,.2f}",
+            "Giá gốc bình quân (FIFO)": f"${pos.average_unit_cost_usd:,.2f}",
             "Giá thị trường": f"${pos.current_mark_price_usd:,.2f}",
             "Giá trị ghi sổ": f"${pos.total_book_value_usd:,.2f}",
             "Giá trị thị trường": f"${pos.market_value_usd:,.2f}",
             "Dự phòng TK 2291": f"${pos.impairment_provision_required_usd:,.2f}",
-            "Tình trạng": "⚠️ Cần trích lập" if pos.is_impaired else "✅ An toàn",
+            "Trạng thái": "⚠️ Cần trích lập" if pos.is_impaired else "✅ An toàn",
         })
-    if table_rows:
-        st.dataframe(table_rows, use_container_width=True)
-    else:
-        st.info("Chưa có vị thế nắm giữ nào trong danh mục.")
 
-    # Form to add demo trade
+    if table_rows:
+        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("Hiện chưa có tài sản nào trong danh mục. Hãy nhập phiếu mua đầu tiên ở form bên dưới!")
+
+    # Interactive Voucher Form
     with (
-        st.expander("📝 Ghi Nhận Giao Dịch Mới (Phiếu Mua/Bán Theo Chuẩn TT 200)"),
-        st.form("trade_form"),
+        st.expander("📝 Ghi Nhận Phiếu Giao Dịch Mua/Bán (Hạch Toán Chuẩn TT 200)"),
+        st.form("quick_trade_voucher_form"),
     ):
-        f_symbol = st.selectbox("Mã tài sản", ["BTCUSDT", "ETHUSDT", "SOLUSDT"])
-        f_acc = st.selectbox("Tài khoản kế toán", ["TK_121 (Lướt sóng)", "TK_228 (Ví lạnh tích sản)"])
-        f_action = st.selectbox("Loại giao dịch", ["BUY", "SELL"])
-        f_qty = st.number_input("Số lượng", min_value=0.0001, value=0.5, step=0.01)
-        default_price = get_symbol_market_profile(f_symbol)["current_price"]
-        f_price = st.number_input("Đơn giá khớp lệnh ($)", min_value=0.1, value=default_price)
-        f_fee = st.number_input("Phí giao dịch ($)", min_value=0.0, value=5.0)
-        submitted = st.form_submit_button("Hạch Toán Giao Dịch")
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            f_symbol = st.selectbox("Mã tài sản", ["BTCUSDT", "ETHUSDT", "SOLUSDT"], index=0)
+            f_acc = st.selectbox("Mục đích đầu tư", ["TK 228 (Ví lạnh tích sản)", "TK 121 (Lướt sóng ngắn hạn)"])
+        with tc2:
+            f_action = st.selectbox("Loại lệnh", ["BUY (Mua vào)", "SELL (Bán ra)"])
+            f_qty = st.number_input("Số lượng coin", min_value=0.0001, value=0.1, step=0.05)
+        with tc3:
+            default_p = get_symbol_market_profile(f_symbol)["current_price"]
+            f_price = st.number_input("Đơn giá khớp lệnh ($)", min_value=0.1, value=default_p)
+            f_fee = st.number_input("Phí sàn ($)", min_value=0.0, value=2.0)
+
+        submitted = st.form_submit_button("💾 Xác Nhận & Hạch Toán Vào Sổ Cái", type="primary")
 
         if submitted:
             acc_code = TT200AccountCode.TK_121 if "121" in f_acc else TT200AccountCode.TK_228
-            act_type = TransactionType.BUY if f_action == "BUY" else TransactionType.SELL
+            act_type = TransactionType.BUY if "BUY" in f_action else TransactionType.SELL
             tx = CryptoTransaction(
                 tx_id=f"tx_{int(datetime.now(UTC).timestamp())}",
                 timestamp=datetime.now(UTC),
@@ -311,13 +563,15 @@ with tab_accounting:
             )
             try:
                 accounting_ledger.record_transaction(tx)
-                st.success(f"✅ Đã ghi nhận giao dịch {f_action} {f_qty} {f_symbol} thành công!")
+                st.success(f"✅ Đã hạch toán thành công lệnh {f_action.split(' ')[0]} {f_qty} {f_symbol}!")
                 st.rerun()
             except ValueError as err:
                 st.error(f"❌ Lỗi hạch toán: {err}")
 
+# --- Footer Disclaimer ---
 st.markdown("---")
 st.caption(
-    "⚠️ **Digital Asset Risk Disclaimer**: This platform is an educational decision-support tool. "
-    "Digital assets involve extreme volatility and structural risk. Never allocate capital you cannot afford to lose."
+    "⚠️ **Khuyến cáo rủi ro tài sản số (Digital Asset Risk Disclaimer)**: "
+    "Hệ thống là công cụ hỗ trợ ra quyết định và kiểm soát tâm lý, không phải lời khuyên đầu tư tài chính. "
+    "Thị trường tài sản số biến động rất mạnh, tuyệt đối không bao giờ mạo hiểm số vốn bạn không thể chấp nhận mất."
 )
