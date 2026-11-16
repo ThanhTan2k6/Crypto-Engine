@@ -9,6 +9,7 @@ import asyncio
 import streamlit as st
 
 from src.agents.graph import run_crypto_audit
+from src.bot.telegram_bot import get_symbol_market_profile
 from src.engine.core_quant import CoreQuantEngine
 
 st.set_page_config(
@@ -36,27 +37,75 @@ proposed_trade = st.sidebar.text_input("Proposed Trade Setup (Optional)", value=
 
 run_audit_btn = st.sidebar.button("🚀 Chạy Thẩm định Rủi ro", type="primary")
 
-# Run quant audit and LangGraph workflow
-engine = CoreQuantEngine()
-quant_audit = engine.run_full_quant_audit(symbol=symbol)
+# Execute audit only when requested by user
+if run_audit_btn:
+    profile = get_symbol_market_profile(symbol)
+    engine = CoreQuantEngine()
+    quant_audit = engine.run_full_quant_audit(
+        symbol=symbol,
+        current_price=profile["current_price"],
+        market_cap=profile["market_cap"],
+        realized_cap=profile["realized_cap"],
+        std_market_cap=profile["std_market_cap"],
+        sma_200d=profile["sma_200d"],
+        sma_200w=profile["sma_200w"],
+        sma_111d=profile["sma_111d"],
+        sma_350d=profile["sma_350d"],
+        open_interest_usd=profile["open_interest_usd"],
+        oi_24h_ago=profile["oi_24h_ago"],
+        circulating_supply=profile["circulating_supply"],
+        total_supply=profile["total_supply"],
+        fdv_usd=profile["fdv_usd"],
+    )
 
+    spot_dict = quant_audit["spot"].model_dump()
+    futures_dict = quant_audit["futures"].model_dump()
+    whale_dict = quant_audit["whale"].model_dump()
+    etf_dict = quant_audit["etf"].model_dump()
+    vesting_dict = quant_audit["vesting"].model_dump()
+
+    whale_dict["exchange_netflow_24h_usd"] = whale_dict.get("netflow_24h_usd", 0.0)
+    etf_dict["netflow_24h_usd"] = etf_dict.get("daily_net_inflow_usd", 0.0)
+    vesting_dict["unlock_percent_of_circulating"] = vesting_dict.get(
+        "next_unlock_pct_of_circulating", 0.0
+    )
+
+    with st.spinner(f"Hội đồng AI đang thẩm định {symbol}..."):
+        audit_state = asyncio.run(
+            run_crypto_audit(
+                symbol=symbol,
+                execution_mode=analysis_mode,
+                spot_valuation_data=spot_dict,
+                futures_squeeze_data=futures_dict,
+                whale_flow_data=whale_dict,
+                etf_flow_data=etf_dict,
+                token_vesting_data=vesting_dict,
+                proposed_action=proposed_trade,
+            )
+        )
+
+    st.session_state["quant_audit"] = quant_audit
+    st.session_state["audit_state"] = audit_state
+    st.session_state["profile"] = profile
+
+if "audit_state" not in st.session_state:
+    st.info(
+        "👋 **Chào mừng bạn đến với CryptoIntel-Engine!**\n\n"
+        "Hệ thống thẩm định độc lập kết hợp toán học lượng hóa không ảo giác (Zero LLM Arithmetic) "
+        "và hội đồng tác tử phản biện Socratic Devil's Advocate.\n\n"
+        "👉 *Vui lòng chọn tài sản ở menu bên trái và nhấn **🚀 Chạy Thẩm định Rủi ro** để bắt đầu.*"
+    )
+    st.stop()
+
+quant_audit = st.session_state["quant_audit"]
+audit_state = st.session_state["audit_state"]
+profile = st.session_state.get("profile", {})
 spot_data = quant_audit["spot"]
 futures_data = quant_audit["futures"]
 whale_data = quant_audit["whale"]
 
-with st.spinner(f"Hội đồng AI đang thẩm định {symbol}..."):
-    audit_state = asyncio.run(
-        run_crypto_audit(
-            symbol=symbol,
-            execution_mode=analysis_mode,
-            spot_valuation_data=spot_data.model_dump(),
-            futures_squeeze_data=futures_data.model_dump(),
-            whale_flow_data=whale_data.model_dump(),
-            etf_flow_data=quant_audit["etf"].model_dump(),
-            token_vesting_data=quant_audit["vesting"].model_dump(),
-            proposed_action=proposed_trade,
-        )
-    )
+if not profile.get("is_calibrated", True):
+    st.warning("⚠️ **Ghi chú:** Đang sử dụng mô hình tham chiếu chuẩn hóa cho tài sản này.")
 
 tab_overview, tab_spot, tab_futures = st.tabs([
     "🏛️ Socratic Audit & Verdict",

@@ -12,14 +12,14 @@ from src.agents.state import CryptoIntelState, SpecialistDossier
 async def spot_node(state: CryptoIntelState) -> dict[str, object]:
     """Execute spot cycle specialist evaluation."""
     spot_data = state.get("spot_valuation_data")
-    if not spot_data:
-        # Default fallback dossier if spot data wasn't provided
+    if state.get("errors") or not spot_data:
+        # Default fallback dossier if errors or spot data wasn't provided
         dossier: SpecialistDossier = {
             "agent_id": "spot_cycle_specialist",
             "verdict": "DATA_UNAVAILABLE",
             "confidence_score": 0.0,
             "risk_level": "UNKNOWN",
-            "key_observations": ["Spot valuation data not supplied."],
+            "key_observations": ["Spot valuation data not supplied or contract invalid."],
             "critical_vulnerabilities": [],
             "timestamp": datetime.now(UTC).isoformat(),
         }

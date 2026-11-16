@@ -18,9 +18,9 @@ from src.agents.nodes import (
 from src.agents.state import CryptoIntelState, create_initial_state
 
 
-def build_crypto_audit_graph() -> StateGraph:
+def build_crypto_audit_graph() -> StateGraph[CryptoIntelState]:
     """Build and wire the multi-agent StateGraph workflow."""
-    workflow = StateGraph(CryptoIntelState)
+    workflow: StateGraph[CryptoIntelState] = StateGraph(CryptoIntelState)
 
     # Register nodes
     workflow.add_node("supervisor", supervisor_node)

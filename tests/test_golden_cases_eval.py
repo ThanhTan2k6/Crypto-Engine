@@ -94,14 +94,14 @@ async def test_all_10_golden_cases_socratic_evaluation():
             f"{case_id} failed: FOMO index {state['fomo_index']} out of [0, 100]"
         )
 
-        # Verify high-risk cases are rejected
-        if expected_verdict == "REJECT_SETUP_TOO_RISKY":
-            # Must strictly reject or caution
-            assert state["anti_fomo_verdict"] in ["REJECT_SETUP_TOO_RISKY", "PROCEED_WITH_CAUTION"]
-            if fomo_min > 0.0:
-                assert state["fomo_index"] >= 20.0, (
-                    f"{case_id} expected high FOMO index, got {state['fomo_index']}"
-                )
+        # Strictly assert expected verdict and calibrated FOMO minimum
+        assert state["anti_fomo_verdict"] == expected_verdict, (
+            f"{case_id} expected verdict {expected_verdict}, got {state['anti_fomo_verdict']}"
+        )
+        if fomo_min > 0.0:
+            assert state["fomo_index"] >= fomo_min, (
+                f"{case_id} expected FOMO index >= {fomo_min}, got {state['fomo_index']}"
+            )
 
         evaluated_count += 1
 

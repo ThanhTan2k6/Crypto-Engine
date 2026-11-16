@@ -25,6 +25,7 @@ async def synthesis_node(state: CryptoIntelState) -> dict[str, object]:
     spot_dossier = state.get("spot_dossier")
     futures_dossier = state.get("futures_dossier")
     whale_dossier = state.get("whale_etf_dossier")
+    errors = state.get("errors", [])
 
     investment_memo = {
         "title": f"CryptoIntel Risk Audit: {symbol}",
@@ -38,16 +39,27 @@ async def synthesis_node(state: CryptoIntelState) -> dict[str, object]:
             "futures": futures_dossier.get("verdict") if futures_dossier else "N/A",
             "whale": whale_dossier.get("verdict") if whale_dossier else "N/A",
         },
+        "errors": errors,
         "disclaimer": DISCLAIMER_TEXT,
     }
 
+    price_str = (
+        f"${invalidation:,.2f}" if invalidation >= 1.0
+        else (f"${invalidation:,.6f}" if invalidation > 0.0 else "$0.00")
+    )
+
     # Format Telegram-ready text payload
     q_text = "\n".join(f"• {q}" for q in questions)
+    error_header = (
+        f"⚠️ *CẢNH BÁO THẨM ĐỊNH THẤT BẠI: {', '.join(errors)}*\n\n"
+        if errors else ""
+    )
     telegram_text = (
+        f"{error_header}"
         f"🛡️ *HỘI ĐỒNG THẨM ĐỊNH RỦI RO: {symbol}*\n\n"
         f"📊 *Chỉ số FOMO:* `{fomo_index}/100`\n"
         f"⚖️ *Phán quyết Anti-FOMO:* *{verdict}*\n"
-        f"🛑 *Mức giá Vô hiệu hóa (Invalidation):* `${invalidation:,.2f}`\n\n"
+        f"🛑 *Mức giá Vô hiệu hóa (Invalidation):* `{price_str}`\n\n"
         f"🗣️ *3 CÂU HỎI PHẢN BIỆN SOCRATIC:*\n{q_text}\n\n"
         f"_{DISCLAIMER_TEXT}_"
     )

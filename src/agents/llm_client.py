@@ -139,10 +139,33 @@ class LLMReasoningClient:
         vesting_data: dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Generate forensic analysis of whale netflows, ETF momentum, and dilution."""
-        netflow = whale_data.get("exchange_netflow_24h_usd", 0.0) if whale_data else 0.0
+        if whale_data is None and etf_data is None and vesting_data is None:
+            return {
+                "agent_id": "whale_and_etf_specialist",
+                "verdict": "DATA_UNAVAILABLE",
+                "confidence_score": 0.50,
+                "risk_level": "MODERATE",
+                "key_observations": ["Whale exchange netflow, ETF tracking, and token vesting data not provided."],
+                "critical_vulnerabilities": ["No on-chain flow transparency available for this asset."],
+            }
+
+        netflow = (
+            whale_data.get("exchange_netflow_24h_usd", whale_data.get("netflow_24h_usd", 0.0))
+            if whale_data else 0.0
+        )
         cnai = whale_data.get("cnai_score", 50.0) if whale_data else 50.0
-        etf_flow = etf_data.get("netflow_24h_usd", 0.0) if etf_data else 0.0
-        unlock_pct = vesting_data.get("unlock_percent_of_circulating", 0.0) if vesting_data else 0.0
+        etf_flow = (
+            etf_data.get("netflow_24h_usd", etf_data.get("daily_net_inflow_usd", 0.0))
+            if etf_data else 0.0
+        )
+        unlock_pct = (
+            vesting_data.get(
+                "unlock_percent_of_circulating",
+                vesting_data.get("next_unlock_pct_of_circulating", 0.0),
+            )
+            if vesting_data else 0.0
+        )
+        dilution_risk = vesting_data.get("dilution_risk", "") if vesting_data else ""
 
         observations: list[str] = []
         vulnerabilities: list[str] = []
@@ -170,7 +193,7 @@ class LLMReasoningClient:
                 f"Exchange netflow is balanced at ${netflow / 1e6:,.1f}M with CNAI score of {cnai}."
             )
 
-        if unlock_pct >= 15.0:
+        if unlock_pct >= 15.0 or dilution_risk == "HIGH_PREDATORY_UNLOCK":
             risk_level = "CRITICAL"
             vulnerabilities.append(
                 f"Imminent token unlock cliff releasing {unlock_pct}% of circulating supply threatens heavy dilution."
@@ -204,39 +227,76 @@ class LLMReasoningClient:
         Synthesize the Socratic Devil's Advocate cross-examination.
         Generates FOMO Index, exactly 3 Fatal Questions, invalidation price, and Anti-FOMO Verdict.
         """
-        flags = hard_red_flags or []
+        flags = list(hard_red_flags or [])
         current_price = spot_quant.get("current_price", 0.0) if spot_quant else (
             futures_quant.get("current_price", 0.0) if futures_quant else 0.0
         )
-        mvrv = spot_quant.get("mvrv_zscore", 2.0) if spot_quant else 2.0
+        mvrv = spot_quant.get("mvrv_zscore", 1.5) if spot_quant else 1.5
         funding_apr = futures_quant.get("annualized_funding_rate", 10.0) if futures_quant else 10.0
         frsi = futures_quant.get("frsi_score", 50.0) if futures_quant else 50.0
         obir = futures_quant.get("orderbook_imbalance_ratio", 0.5) if futures_quant else 0.5
-        netflow = whale_quant.get("exchange_netflow_24h_usd", 0.0) if whale_quant else 0.0
-        pocket_below = futures_quant.get("liquidation_pocket_below", current_price * 0.95) if futures_quant else current_price * 0.95
-        dca3 = spot_quant.get("dca_zone_aggressive", current_price * 0.70) if spot_quant else current_price * 0.70
+        netflow = (
+            whale_quant.get("exchange_netflow_24h_usd", whale_quant.get("netflow_24h_usd", 0.0))
+            if whale_quant else 0.0
+        )
+        pocket_below = (
+            futures_quant.get("liquidation_pocket_below", current_price * 0.95)
+            if futures_quant else current_price * 0.95
+        )
+        pocket_above = (
+            futures_quant.get("liquidation_pocket_above", current_price * 1.05)
+            if futures_quant else current_price * 1.05
+        )
+        dca3 = (
+            spot_quant.get("dca_zone_aggressive", current_price * 0.70)
+            if spot_quant else current_price * 0.70
+        )
 
         # Compute deterministic FOMO Index based on quantitative metrics
-        fomo_points = 0.0
+        fomo_points = 20.0
         if mvrv >= 4.0:
             fomo_points += 35.0
         elif mvrv >= 2.5:
             fomo_points += 15.0
+        elif mvrv <= 0.8:
+            fomo_points = max(0.0, fomo_points - 5.0)
 
-        if funding_apr >= 70.0:
+        if funding_apr >= 80.0 or frsi >= 90.0:
             fomo_points += 35.0
+        elif funding_apr >= 50.0 or frsi >= 75.0:
+            fomo_points += 25.0
         elif funding_apr >= 30.0:
             fomo_points += 15.0
-
-        if netflow >= 500_000_000.0:
-            fomo_points += 20.0
-        elif netflow <= -300_000_000.0:
-            fomo_points = max(0.0, fomo_points - 15.0)
-
-        if obir < 0.30:
+        elif funding_apr <= -50.0:
             fomo_points += 10.0
 
-        fomo_index = min(100.0, max(5.0, round(fomo_points + 20.0, 1)))
+        if netflow >= 1_000_000_000.0:
+            fomo_points += 25.0
+        elif netflow >= 500_000_000.0:
+            fomo_points += 15.0
+        elif netflow <= -300_000_000.0:
+            fomo_points = max(0.0, fomo_points - 10.0)
+
+        if obir < 0.35:
+            fomo_points += 10.0
+
+        if any("MACRO" in f for f in flags):
+            fomo_points += 30.0
+
+        if any(
+            any(kw in f for kw in [
+                "CEX_INFLOW",
+                "LONG_LEVERAGE",
+                "PI_CYCLE",
+                "OVERHEATED",
+                "CYCLE_TOP",
+                "BEARISH_VOLUME",
+            ])
+            for f in flags
+        ):
+            fomo_points += 15.0
+
+        fomo_index = min(100.0, max(5.0, round(fomo_points, 1)))
 
         # Evaluate critical red flags
         critical_reject_keywords = [
@@ -252,13 +312,18 @@ class LLMReasoningClient:
             "WASH_TRADING",
             "CEX_HYPER_INFLOW",
             "MASSIVE_CEX_INFLOW",
+            "BEARISH_VOLUME",
         ]
         has_critical_flag = any(
             any(kw in flag for kw in critical_reject_keywords) for flag in flags
         )
 
         has_accumulation_flag = any(
-            any(kw in flag for kw in ["PEAK_RETAIL_PANIC", "SMART_MONEY_ACCUMULATION", "GLOBAL_LIQUIDITY_CASH_CRUNCH"])
+            any(kw in flag for kw in [
+                "PEAK_RETAIL_PANIC",
+                "SMART_MONEY_ACCUMULATION",
+                "GLOBAL_LIQUIDITY_CASH_CRUNCH",
+            ])
             for flag in flags
         )
 
@@ -267,14 +332,29 @@ class LLMReasoningClient:
             fomo_index = max(fomo_index, 75.0)
         elif has_accumulation_flag or (mvrv <= 0.8 and funding_apr <= 0.0):
             verdict = "SCALE_IN_SPOT"
-            fomo_index = min(fomo_index, 25.0)
+            fomo_index = min(25.0, max(15.0, round(fomo_index, 1)))
         else:
             verdict = "PROCEED_WITH_CAUTION"
 
+        # Determine invalidation price according to proposed action direction
+        is_short = proposed_action is not None and any(
+            kw in proposed_action.upper() for kw in ["SHORT", "SCALP_SHORT", "SELL"]
+        )
+        if is_short:
+            invalidation_price = (
+                pocket_above if pocket_above > 0.0
+                else (current_price * 1.05 if current_price > 0.0 else 0.0)
+            )
+        else:
+            invalidation_price = (
+                pocket_below if pocket_below > 0.0
+                else max(0.0, dca3)
+            )
+
         # Formulate Exactly 3 Fatal Socratic Cross-Examinations
         q1 = (
-            f"Khi MVRV Z-Score đang ở mức {mvrv} (vùng rủi ro lịch sử với nguy cơ sụt giảm sâu về sàn 200W-MA "
-            f"${dca3:,.2f}), bạn đã chuẩn bị phương án quản trị vốn nào nếu thị trường điều chỉnh 40-70% thay vì tiếp tục tăng?"
+            f"Khi MVRV Z-Score đang ở mức {mvrv:.2f} và vùng tích sản an toàn là "
+            f"${dca3:g}, bạn đã chuẩn bị phương án quản trị rủi ro thế nào nếu thị trường điều chỉnh về mức giá này thay vì tiếp tục tăng?"
         )
         q2 = (
             f"Trong 24h qua, sàn ghi nhận Netflow ${netflow / 1e6:,.1f}M với tỷ lệ Orderbook Imbalance {obir:.2f}. "
@@ -282,23 +362,13 @@ class LLMReasoningClient:
         )
         q3 = (
             f"Funding Rate đang ở mức APR {funding_apr:.1f}% (FRSI {frsi:.1f}) với cụm dừng lỗ thanh lý tiềm năng tại "
-            f"${pocket_below:,.2f}. Vị thế của bạn có chịu đựng được một cú quét thanh lý đòn bẩy đột ngột trước khi xác nhận xu hướng không?"
+            f"${invalidation_price:g}. Vị thế của bạn có chịu đựng được một cú quét thanh lý đòn bẩy đột ngột trước khi xác nhận xu hướng không?"
         )
-        q2 = (
-            f"Trong 24h qua, sàn ghi nhận Netflow ${netflow / 1e6:,.1f}M với tỷ lệ Orderbook Imbalance {obir:.2f}. "
-            f"Liệu bạn có đang hành động theo cảm xúc để trở thành thanh khoản rút lui (exit liquidity) cho các dòng tiền tổ chức?"
-        )
-        q3 = (
-            f"Funding Rate đang ở mức APR {funding_apr:.1f}% (FRSI {frsi:.1f}) với cụm dừng lỗ thanh lý tiềm năng tại "
-            f"${pocket_below:,.2f}. Vị thế của bạn có chịu đựng được một cú quét thanh lý đòn bẩy đột ngột trước khi xác nhận xu hướng không?"
-        )
-
-        invalidation_price = pocket_below if pocket_below > 0.0 else dca3
 
         return {
             "fomo_index": fomo_index,
             "fatal_socratic_questions": [q1, q2, q3],
-            "worst_case_invalidation_price": round(float(invalidation_price), 2),
+            "worst_case_invalidation_price": float(invalidation_price),
             "thesis_refutations": [
                 f"Tâm lý thị trường đang định giá quá mức triển vọng ngắn hạn với chỉ số FOMO đạt {fomo_index}/100.",
                 f"Độ sâu thanh khoản mỏng (OBIR {obir:.2f}) khiến rủi ro trượt giá và bẫy dừng lỗ tăng cao.",

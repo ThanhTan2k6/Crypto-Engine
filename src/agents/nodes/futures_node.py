@@ -12,13 +12,13 @@ from src.agents.state import CryptoIntelState, SpecialistDossier
 async def futures_node(state: CryptoIntelState) -> dict[str, object]:
     """Execute perpetual futures leverage & liquidation risk evaluation."""
     futures_data = state.get("futures_squeeze_data")
-    if not futures_data:
+    if state.get("errors") or not futures_data:
         dossier: SpecialistDossier = {
             "agent_id": "futures_squeeze_specialist",
             "verdict": "DATA_UNAVAILABLE",
             "confidence_score": 0.0,
             "risk_level": "UNKNOWN",
-            "key_observations": ["Futures squeeze data not supplied."],
+            "key_observations": ["Futures squeeze data not supplied or contract invalid."],
             "critical_vulnerabilities": [],
             "timestamp": datetime.now(UTC).isoformat(),
         }

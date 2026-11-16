@@ -9,6 +9,24 @@ from src.agents.state import CryptoIntelState
 
 async def socratic_node(state: CryptoIntelState) -> dict[str, object]:
     """Execute Socratic Devil's Advocate cross-examination."""
+    errors = state.get("errors", [])
+    if errors:
+        err_msg = ", ".join(errors)
+        return {
+            "fomo_index": 100.0,
+            "fatal_socratic_questions": [
+                f"Kiểm định thất bại: Dữ liệu định lượng bị thiếu ({err_msg}). Bạn có chấp nhận rủi ro mất trắng vốn khi giao dịch mà không có dữ liệu số học bảo chứng không?",
+                "Tại sao bạn lại muốn giải ngân khi hệ thống giám sát rủi ro chưa nhận được hợp đồng định lượng hợp lệ?",
+                "Quy tắc tối thượng: Không có dữ liệu toán học = Không giải ngân. Kế hoạch dừng lại ngay lập tức của bạn là gì?",
+            ],
+            "worst_case_invalidation_price": 0.0,
+            "thesis_refutations": [
+                f"Thiếu hợp đồng định lượng bắt buộc: {err_msg}",
+                "Vi phạm nguyên tắc Zero LLM Arithmetic: Không được suy đoán số liệu khi thiếu dữ liệu lượng hóa.",
+            ],
+            "anti_fomo_verdict": "REJECT_SETUP_TOO_RISKY",
+        }
+
     symbol = state.get("symbol", "BTCUSDT")
     spot_dossier = state.get("spot_dossier")
     futures_dossier = state.get("futures_dossier")

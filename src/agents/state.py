@@ -75,13 +75,44 @@ def create_initial_state(
     trace_id: str = "",
     hard_red_flags: list[str] | None = None,
 ) -> CryptoIntelState:
-    """Factory function to build a clean initialized state."""
+    """Factory function to build a clean initialized state and validate contracts."""
+    errors: list[str] = []
+
+    # Enforce type safety & boundary validation on incoming quant payloads
+    valid_spot_data = spot_valuation_data
+    if spot_valuation_data is not None:
+        if isinstance(spot_valuation_data, dict):
+            for field in ["current_price", "mvrv_zscore"]:
+                if field in spot_valuation_data:
+                    try:
+                        float(spot_valuation_data[field])
+                    except (ValueError, TypeError):
+                        errors.append(f"Invalid non-numeric contract for spot_valuation_data.{field}")
+                        valid_spot_data = None
+        else:
+            errors.append("spot_valuation_data must be a valid dictionary or BaseModel contract")
+            valid_spot_data = None
+
+    valid_futures_data = futures_squeeze_data
+    if futures_squeeze_data is not None:
+        if isinstance(futures_squeeze_data, dict):
+            for field in ["current_price", "annualized_funding_rate", "frsi_score"]:
+                if field in futures_squeeze_data:
+                    try:
+                        float(futures_squeeze_data[field])
+                    except (ValueError, TypeError):
+                        errors.append(f"Invalid non-numeric contract for futures_squeeze_data.{field}")
+                        valid_futures_data = None
+        else:
+            errors.append("futures_squeeze_data must be a valid dictionary or BaseModel contract")
+            valid_futures_data = None
+
     return {
         "symbol": symbol.upper(),
         "timestamp": datetime.now(UTC).isoformat(),
         "execution_mode": execution_mode,
-        "spot_valuation_data": spot_valuation_data,
-        "futures_squeeze_data": futures_squeeze_data,
+        "spot_valuation_data": valid_spot_data,
+        "futures_squeeze_data": valid_futures_data,
         "etf_flow_data": etf_flow_data,
         "whale_flow_data": whale_flow_data,
         "token_vesting_data": token_vesting_data,
@@ -99,6 +130,6 @@ def create_initial_state(
         "anti_fomo_verdict": "PROCEED_WITH_CAUTION",
         "investment_memo": None,
         "telegram_alert_payload": None,
-        "errors": [],
+        "errors": errors,
         "trace_id": trace_id or f"audit_{symbol.lower()}_{int(datetime.now(UTC).timestamp())}",
     }
