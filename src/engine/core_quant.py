@@ -181,6 +181,23 @@ def get_symbol_market_profile(symbol: str) -> dict[str, Any]:
             "fdv_usd": 107_000_000_000.0,
             "is_calibrated": True,
         }
+    elif sym == "XRP":
+        return {
+            "current_price": 0.95,
+            "market_cap": 54_000_000_000.0,
+            "realized_cap": 28_000_000_000.0,
+            "std_market_cap": 12_000_000_000.0,
+            "sma_200d": 0.62,
+            "sma_200w": 0.52,
+            "sma_111d": 0.70,
+            "sma_350d": 0.58,
+            "open_interest_usd": 600_000_000.0,
+            "oi_24h_ago": 580_000_000.0,
+            "circulating_supply": 56_800_000_000.0,
+            "total_supply": 100_000_000_000.0,
+            "fdv_usd": 95_000_000_000.0,
+            "is_calibrated": True,
+        }
     return {
         "current_price": 95000.0,
         "market_cap": 1880000000000.0,

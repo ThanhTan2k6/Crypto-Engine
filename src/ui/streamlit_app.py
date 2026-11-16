@@ -263,7 +263,7 @@ with st.container():
     with c_sym:
         preset_symbol = st.selectbox(
             "🪙 Chọn Coin Thẩm Định:",
-            options=["BTCUSDT (Bitcoin)", "ETHUSDT (Ethereum)", "SOLUSDT (Solana)"],
+            options=["BTCUSDT (Bitcoin)", "ETHUSDT (Ethereum)", "SOLUSDT (Solana)", "XRPUSDT (Ripple)"],
             index=0,
         )
         selected_symbol = preset_symbol.split(" ")[0]
@@ -355,8 +355,8 @@ with tab_bot:
 
     # Multi-Symbol Configuration
     selected_bot_coins = st.multiselect(
-        "🪙 Danh mục Coin quét & giao dịch song song (1 - 3 coin cùng lúc):",
-        ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        "🪙 Danh mục Coin quét & giao dịch song song (1 - 4 coin cùng lúc):",
+        ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"],
         default=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
         help="Bot sẽ đồng thời quét tín hiệu, mở vị thế và quản trị rủi ro 1.5% độc lập cho từng coin.",
     )
@@ -800,6 +800,7 @@ with tab_accounting:
         "BTCUSDT": get_symbol_market_profile("BTCUSDT")["current_price"],
         "ETHUSDT": get_symbol_market_profile("ETHUSDT")["current_price"],
         "SOLUSDT": get_symbol_market_profile("SOLUSDT")["current_price"],
+        "XRPUSDT": get_symbol_market_profile("XRPUSDT")["current_price"],
     }
     prices[active_symbol] = spot_data.current_price
 
@@ -820,7 +821,7 @@ with tab_accounting:
         with st.form("manual_tx_form", clear_on_submit=True):
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
-                f_symbol = st.selectbox("Mã Coin", ["BTCUSDT", "ETHUSDT", "SOLUSDT"], index=0)
+                f_symbol = st.selectbox("Mã Coin", ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"], index=0)
                 f_action = st.selectbox("Loại Giao Dịch", ["BUY (Mua vào - TK 121)", "SELL (Bán ra - FIFO)"], index=0)
             with col_f2:
                 f_qty = st.number_input("Số lượng", min_value=0.0001, value=0.05, step=0.01)
