@@ -34,6 +34,7 @@ jobs:
         run: |
           git config --local user.email "bot-runner@cryptointel.internal"
           git config --local user.name "CryptoIntel 24/7 Runner"
-          git add data/paper_trading_state.json || true
+          git add data/paper_trading_state.json
           git commit -m "chore(bot): 24/7 forward-test tick state update [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin main || true
           git push origin main || echo "Nothing to push"

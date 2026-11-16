@@ -1,0 +1,8 @@
+{
+  "initial_balance": 10000.0,
+  "balance_usd": 10000.0,
+  "peak_balance": 10000.0,
+  "max_drawdown_pct": 0.0,
+  "active_positions": {},
+  "completed_trades": []
+}
