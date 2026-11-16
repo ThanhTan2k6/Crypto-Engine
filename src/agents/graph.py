@@ -30,20 +30,12 @@ def build_crypto_audit_graph() -> StateGraph:
     workflow.add_node("socratic_devil", socratic_node)
     workflow.add_node("synthesis", synthesis_node)
 
-    # Edge definitions
+    # Pipeline flow: Supervisor -> Specialists -> Socratic Inquisitor -> Synthesis
     workflow.add_edge(START, "supervisor")
-
-    # Supervisor fans out in parallel to the 3 analytical specialists
     workflow.add_edge("supervisor", "spot_specialist")
-    workflow.add_edge("supervisor", "futures_specialist")
-    workflow.add_edge("supervisor", "whale_specialist")
-
-    # Fan-in barrier: All specialists converge into the Socratic Inquisitor
-    workflow.add_edge("spot_specialist", "socratic_devil")
-    workflow.add_edge("futures_specialist", "socratic_devil")
+    workflow.add_edge("spot_specialist", "futures_specialist")
+    workflow.add_edge("futures_specialist", "whale_specialist")
     workflow.add_edge("whale_specialist", "socratic_devil")
-
-    # Socratic Devil moves to synthesis and finishes
     workflow.add_edge("socratic_devil", "synthesis")
     workflow.add_edge("synthesis", END)
 
