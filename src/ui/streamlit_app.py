@@ -19,13 +19,18 @@ import streamlit as st
 
 from src.agents.graph import run_crypto_audit
 from src.agents.state import CryptoIntelState
-from src.api.main import accounting_ledger
 from src.engine.accounting_tt200 import (
     CryptoTransaction,
     TransactionType,
     TT200AccountCode,
+    accounting_ledger,
 )
 from src.engine.core_quant import CoreQuantEngine, get_symbol_market_profile
+from src.execution import (
+    BotMode,
+    SignalDirection,
+    trading_bot_coordinator,
+)
 from src.ingestion.binance_client import BinancePublicClient
 
 # Page Configuration
@@ -437,12 +442,13 @@ with m4:
 
 st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-# --- 4 Concise Tabs (Never Truncated) ---
-tab_socratic, tab_spot, tab_futures, tab_accounting = st.tabs([
+# --- 5 Concise Tabs (Never Truncated) ---
+tab_socratic, tab_spot, tab_futures, tab_accounting, tab_bot = st.tabs([
     "🛡️ Phản Biện Socratic",
     "🎯 Vùng DCA & Chốt Lời",
     "⚡ Đòn Bẩy Futures",
     "💼 Sổ Cái TT 200",
+    "🤖 Bot Tự Động (Auto-Trading)",
 ])
 
 # ==================== TAB 1: SOCRATIC AUDIT ====================
@@ -672,6 +678,118 @@ with tab_accounting:
                 st.rerun()
             except ValueError as err:
                 st.error(f"❌ Lỗi hạch toán: {err}")
+
+# ==================== TAB 5: AUTOMATED TRADING BOT ====================
+with tab_bot:
+    st.markdown("#### 🤖 Bot Định Lượng Tự Động (Quantitative Auto-Trading Engine)")
+    st.caption(
+        "Kỷ luật giao dịch cơ học không tâm lý: Quản trị rủi ro 1.5% vốn/lệnh • "
+        "Tỷ lệ R:R cố định 1:1.5 - 1:2.0 • Lọc rủi ro Socratic Veto • Tự động hạch toán Thông tư 200."
+    )
+
+    # Bot Status & Control Row
+    bc_col1, bc_col2, bc_col3, bc_col4 = st.columns([2, 1, 1, 2])
+    with bc_col1:
+        st.markdown(
+            f"Trạng thái: **{trading_bot_coordinator.status.value}** | Chế độ: **{trading_bot_coordinator.mode.value}**"
+        )
+    with bc_col2:
+        if st.button("▶️ Khởi Động", type="primary", use_container_width=True):
+            trading_bot_coordinator.start(mode=BotMode.PAPER_TRADING)
+            st.rerun()
+    with bc_col3:
+        if st.button("⏹️ Dừng Bot", use_container_width=True):
+            trading_bot_coordinator.stop()
+            st.rerun()
+    with bc_col4:
+        trigger_tick = st.button("⚡ Quét & Khớp Lệnh Ngay", use_container_width=True)
+
+    if trigger_tick:
+        with st.spinner("Bot đang quét tín hiệu và kiểm tra Socratic Veto..."):
+            tick_res = asyncio.run(
+                trading_bot_coordinator.evaluate_tick(
+                    symbol=active_symbol,
+                    current_price=spot_data.current_price,
+                    quant_audit=quant_audit,
+                    audit_state=audit_state,
+                )
+            )
+            exec_orders = tick_res.get("executed_orders", [])
+            vetoed = tick_res.get("vetoed_signals", [])
+            if exec_orders:
+                st.success(f"🚀 Bot đã mở {len(exec_orders)} lệnh mới thành công!")
+            elif vetoed:
+                st.warning(f"🛡️ Socratic Filter đã VETO chặn {len(vetoed)} lệnh có rủi ro bất cân xứng!")
+            else:
+                st.info(f"ℹ️ Không có tín hiệu mới hoặc trạng thái: {tick_res.get('action')}")
+
+    # Telemetry Cards
+    stats = trading_bot_coordinator.get_stats()
+    b1, b2, b3, b4, b5 = st.columns(5)
+    with b1:
+        st.metric("Số Lệnh Đã Đóng", f"{stats.total_trades}")
+    with b2:
+        win_label = "✅ Đạt chuẩn (>51%)" if stats.win_rate_pct >= 51.0 else "Đang tích lũy mẫu"
+        st.metric("Tỷ Lệ Thắng (Winrate)", f"{stats.win_rate_pct:.1f}%", win_label)
+    with b3:
+        st.metric("Hệ Số Lợi Nhuận (PF)", f"{stats.profit_factor:.2f}")
+    with b4:
+        st.metric("Kỳ Vọng Toán Học (EV)", f"{stats.expected_value_r:+.2f} R")
+    with b5:
+        st.metric("Số Dư Ví Paper", f"${stats.current_balance_usd:,.2f}", f"${stats.total_realized_pnl_usd:+,.2f}")
+
+    # Active Positions Table
+    st.markdown("##### 📌 Vị Thế Đang Mở (Open Positions)")
+    active_pos = trading_bot_coordinator.get_active_positions()
+    if active_pos:
+        pos_rows = []
+        for p in active_pos:
+            unrealized = (
+                (spot_data.current_price - p.entry_price) * p.quantity
+                if p.direction == SignalDirection.BUY
+                else (p.entry_price - spot_data.current_price) * p.quantity
+            )
+            pos_rows.append({
+                "Mã": p.symbol,
+                "Chiều": p.direction.value,
+                "Chiến lược": p.strategy.value,
+                "Khối lượng": f"{p.quantity:.4f}",
+                "Giá vào": f"${p.entry_price:,.2f}",
+                "Cắt lỗ (SL)": f"${p.stop_loss:,.2f}",
+                "Chốt lời (TP)": f"${p.take_profit:,.2f}",
+                "PnL Tạm Tính": f"${unrealized:+,.2f}",
+            })
+        st.dataframe(pos_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("Hiện không có vị thế mở nào. Bấm '⚡ Quét & Khớp Lệnh Ngay' khi bot đang Bật để tìm tín hiệu.")
+
+    # Closed Trade History Table
+    st.markdown("##### 📜 Lịch Sử Lệnh Đã Đóng (Closed Trades)")
+    closed_trades = trading_bot_coordinator.get_trade_history()
+    if closed_trades:
+        hist_rows = []
+        for t in reversed(closed_trades[-15:]):
+            hist_rows.append({
+                "Mã": t.symbol,
+                "Chiều": t.direction.value,
+                "Giá vào": f"${t.entry_price:,.2f}",
+                "Giá đóng": f"${t.exit_price:,.2f}" if t.exit_price else "-",
+                "Lý do đóng": t.exit_reason,
+                "Lãi/Lỗ Ròng": f"${t.realized_pnl_usd:+,.2f}",
+                "Kết quả": "🟢 THẮNG" if t.is_winner else "🔴 THUA",
+            })
+        st.dataframe(hist_rows, use_container_width=True, hide_index=True)
+    else:
+        st.write("Chưa có lịch sử lệnh nào hoàn tất.")
+
+    # Expandable Logs
+    with st.expander("📋 Nhật Ký Hoạt Động Của Bot (Activity Logs)"):
+        logs = trading_bot_coordinator.activity_logs
+        if logs:
+            for l in reversed(logs[-15:]):
+                st.caption(f"`{l['timestamp']}` - **[{l['event']}]** {l['message']}")
+        else:
+            st.caption("Chưa có sự kiện nào.")
 
 # --- Footer Disclaimer ---
 st.markdown("---")

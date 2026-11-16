@@ -16,48 +16,18 @@ from pydantic import BaseModel, Field
 from src.agents.graph import run_crypto_audit
 from src.engine.accounting_tt200 import (
     CryptoTransaction,
-    InventoryCostMethod,
     TransactionType,
     TT200AccountCode,
-    TT200AccountingEngine,
+    accounting_ledger,
 )
 from src.engine.core_quant import CoreQuantEngine, get_symbol_market_profile
+from src.execution import (
+    BotMode,
+    StrategyType,
+    trading_bot_coordinator,
+)
 from src.llmops.cache import audit_cache
 from src.llmops.langfuse_tracer import llmops_tracer
-
-# Initialize shared accounting ledger for Circular 200 demonstration
-accounting_ledger = TT200AccountingEngine(
-    costing_method=InventoryCostMethod.FIFO,
-    initial_cash_usd=1_000_000.0,
-)
-
-# Seed with standard initial demo positions under TT 200
-accounting_ledger.record_transaction(
-    CryptoTransaction(
-        tx_id="tx_seed_btc_cold",
-        timestamp=datetime.now(UTC),
-        symbol="BTCUSDT",
-        account=TT200AccountCode.TK_228,
-        action=TransactionType.BUY,
-        quantity=5.0,
-        price_usd=62000.0,
-        fee_usd=15.0,
-        notes="Strategic Accumulation Lot 1 in Cold Storage",
-    )
-)
-accounting_ledger.record_transaction(
-    CryptoTransaction(
-        tx_id="tx_seed_eth_trading",
-        timestamp=datetime.now(UTC),
-        symbol="ETHUSDT",
-        account=TT200AccountCode.TK_121,
-        action=TransactionType.BUY,
-        quantity=30.0,
-        price_usd=3500.0,
-        fee_usd=25.0,
-        notes="Swing trading inventory",
-    )
-)
 
 
 @asynccontextmanager
@@ -103,6 +73,14 @@ class TransactionRequest(BaseModel):
     price_usd: float = Field(..., ge=0.0)
     fee_usd: float = Field(default=0.0, ge=0.0)
     notes: str = ""
+
+
+class BotControlRequest(BaseModel):
+    """Payload to start, stop, or configure the automated trading bot."""
+
+    action: str = Field(..., description="START, STOP, or PAUSE")
+    mode: BotMode = BotMode.PAPER_TRADING
+    strategies: list[StrategyType] | None = None
 
 
 @app.get("/health", tags=["System"])
@@ -287,3 +265,41 @@ async def get_cache_stats() -> dict[str, Any]:
 async def get_llmops_traces(limit: int = Query(default=10, ge=1, le=50)) -> list[dict[str, Any]]:
     """Return recent LLMOps audit traces and latency telemetry."""
     return llmops_tracer.get_recent_traces(limit=limit)
+
+
+@app.post("/api/v1/bot/control", tags=["Automated Trading Bot"])
+async def control_trading_bot(req: BotControlRequest) -> dict[str, Any]:
+    """Control automated trading bot lifecycle and strategies."""
+    act = req.action.upper()
+    if act == "START":
+        trading_bot_coordinator.start(mode=req.mode)
+        if req.strategies:
+            trading_bot_coordinator.set_enabled_strategies(req.strategies)
+    elif act == "STOP":
+        trading_bot_coordinator.stop()
+    elif act == "PAUSE":
+        trading_bot_coordinator.pause()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid action '{req.action}'. Expected START, STOP, or PAUSE.",
+        )
+
+    return {
+        "status": trading_bot_coordinator.status.value,
+        "mode": trading_bot_coordinator.mode.value,
+        "enabled_strategies": [s.value for s in trading_bot_coordinator.enabled_strategies],
+    }
+
+
+@app.get("/api/v1/bot/status", tags=["Automated Trading Bot"])
+async def get_bot_status() -> dict[str, Any]:
+    """Retrieve full quantitative performance, active positions, and telemetry."""
+    return {
+        "status": trading_bot_coordinator.status.value,
+        "mode": trading_bot_coordinator.mode.value,
+        "enabled_strategies": [s.value for s in trading_bot_coordinator.enabled_strategies],
+        "active_positions": [p.model_dump() for p in trading_bot_coordinator.get_active_positions()],
+        "performance": trading_bot_coordinator.get_stats().model_dump(),
+        "recent_logs": trading_bot_coordinator.activity_logs[-25:],
+    }

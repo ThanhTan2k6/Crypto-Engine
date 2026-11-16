@@ -98,3 +98,29 @@ def test_api_cache_stats_and_traces():
     assert traces_res.status_code == 200
     traces = traces_res.json()
     assert isinstance(traces, list)
+
+
+def test_api_bot_control_and_status():
+    """Verify automated trading bot control and status endpoints."""
+    # Start bot in PAPER_TRADING mode
+    ctrl_res = client.post(
+        "/api/v1/bot/control",
+        json={"action": "START", "mode": "PAPER_TRADING"},
+    )
+    assert ctrl_res.status_code == 200
+    ctrl_data = ctrl_res.json()
+    assert ctrl_data["status"] == "RUNNING"
+    assert ctrl_data["mode"] == "PAPER_TRADING"
+
+    # Check status
+    stat_res = client.get("/api/v1/bot/status")
+    assert stat_res.status_code == 200
+    stat_data = stat_res.json()
+    assert stat_data["status"] == "RUNNING"
+    assert "performance" in stat_data
+    assert "active_positions" in stat_data
+
+    # Stop bot
+    stop_res = client.post("/api/v1/bot/control", json={"action": "STOP"})
+    assert stop_res.status_code == 200
+    assert stop_res.json()["status"] == "STOPPED"

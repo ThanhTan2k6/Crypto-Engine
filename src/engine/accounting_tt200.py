@@ -348,3 +348,38 @@ class TT200AccountingEngine:
             net_asset_value_usd=nav,
             positions=positions,
         )
+
+
+# Global shared accounting ledger instance under Circular 200/2014/TT-BTC
+accounting_ledger = TT200AccountingEngine(
+    costing_method=InventoryCostMethod.FIFO,
+    initial_cash_usd=1_000_000.0,
+)
+
+# Seed standard baseline positions for live evaluation
+accounting_ledger.record_transaction(
+    CryptoTransaction(
+        tx_id="tx_seed_btc_cold",
+        timestamp=datetime.now(UTC),
+        symbol="BTCUSDT",
+        account=TT200AccountCode.TK_228,
+        action=TransactionType.BUY,
+        quantity=5.0,
+        price_usd=62000.0,
+        fee_usd=15.0,
+        notes="Strategic Accumulation Lot 1 in Cold Storage",
+    )
+)
+accounting_ledger.record_transaction(
+    CryptoTransaction(
+        tx_id="tx_seed_eth_trading",
+        timestamp=datetime.now(UTC),
+        symbol="ETHUSDT",
+        account=TT200AccountCode.TK_121,
+        action=TransactionType.BUY,
+        quantity=40.0,
+        price_usd=2800.0,
+        fee_usd=25.0,
+        notes="Trading Lot 1 on CEX Inventory",
+    )
+)
