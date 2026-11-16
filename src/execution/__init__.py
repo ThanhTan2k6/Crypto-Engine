@@ -6,6 +6,7 @@ from src.execution.backtest_engine import BacktestResult, BacktestTrade, Histori
 from src.execution.bot_coordinator import TradingBotCoordinator, trading_bot_coordinator
 from src.execution.order_executor import BinanceLiveExecutor, PaperTradingEngine
 from src.execution.risk_manager import PositionSizer, SocraticRiskFilter
+from src.execution.runner import run_single_tick_for_symbols
 from src.execution.schemas import (
     BotMode,
     BotPerformanceStats,
@@ -36,5 +37,6 @@ __all__ = [
     "TradeRecord",
     "TradeSignal",
     "TradingBotCoordinator",
+    "run_single_tick_for_symbols",
     "trading_bot_coordinator",
 ]

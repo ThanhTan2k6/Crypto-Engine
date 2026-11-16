@@ -30,6 +30,7 @@ from src.execution import (
     BotMode,
     HistoricalBacktester,
     SignalDirection,
+    run_single_tick_for_symbols,
     trading_bot_coordinator,
 )
 from src.ingestion.binance_client import BinancePublicClient
@@ -715,24 +716,31 @@ with tab_bot:
             trading_bot_coordinator.paper_engine.reset_account()
             st.rerun()
 
+    # Multi-Symbol Configuration
+    selected_bot_coins = st.multiselect(
+        "🪙 Danh mục Coin quét & giao dịch song song (1 - 3 coin):",
+        ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        default=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        help="Bot sẽ đồng thời quét tín hiệu, mở vị thế và quản trị rủi ro 1.5% độc lập cho từng coin.",
+    )
+
     if trigger_tick:
-        with st.spinner("Bot đang quét tín hiệu và kiểm tra Socratic Veto..."):
-            tick_res = asyncio.run(
-                trading_bot_coordinator.evaluate_tick(
-                    symbol=active_symbol,
-                    current_price=spot_data.current_price,
-                    quant_audit=quant_audit,
-                    audit_state=audit_state,
+        target_coins = selected_bot_coins if selected_bot_coins else [active_symbol]
+        with st.spinner(f"Bot đang quét tín hiệu trực tiếp cho {target_coins}..."):
+            tick_summary = asyncio.run(
+                run_single_tick_for_symbols(
+                    symbols=target_coins,
+                    quant_engine=CoreQuantEngine(),
+                    client=BinancePublicClient(),
                 )
             )
-            exec_orders = tick_res.get("executed_orders", [])
-            vetoed = tick_res.get("vetoed_signals", [])
-            if exec_orders:
-                st.success(f"🚀 Bot đã mở {len(exec_orders)} lệnh mới thành công!")
-            elif vetoed:
-                st.warning(f"🛡️ Socratic Filter đã VETO chặn {len(vetoed)} lệnh có rủi ro bất cân xứng!")
+            total_new = sum(d.get("new_orders", 0) for d in tick_summary.values() if isinstance(d, dict))
+            total_closed = sum(d.get("closed", 0) for d in tick_summary.values() if isinstance(d, dict))
+            coins_str = ", ".join(target_coins)
+            if total_new > 0 or total_closed > 0:
+                st.success(f"🚀 Hoàn tất quét {coins_str}: Đã mở {total_new} vị thế mới | Đã đóng {total_closed} vị thế!")
             else:
-                st.info(f"ℹ️ Không có tín hiệu mới hoặc trạng thái: {tick_res.get('action')}")
+                st.info(f"ℹ️ Đã quét {coins_str}: Thị trường chưa có tín hiệu mới đạt chuẩn an toàn.")
 
     # Telemetry Cards
     stats = trading_bot_coordinator.get_stats()
@@ -886,6 +894,26 @@ with tab_bot:
                 for t in reversed(bk_res.trades)
             ]
             st.dataframe(bk_trade_rows, use_container_width=True, hide_index=True)
+
+    # 24/7 Cloud Execution Guide
+    with st.expander("☁️ Hướng Dẫn Treo Forward-Test 24/7 Ngay Cả Khi Tắt Máy (Miễn Phí 0đ)"):
+        st.markdown(
+            """
+            Để bot liên tục quét nến và khớp lệnh ngay cả khi bạn **tắt máy tính xách tay hoặc đi ngủ**, bạn có 2 giải pháp:
+
+            **1. Chạy Headless Runner trên Terminal (Máy cắm sạc chỉ tắt màn hình)**
+            - Mở PowerShell / Terminal và chạy lệnh nền:
+              ```bash
+              python -m src.execution.runner --symbols BTCUSDT,ETHUSDT,SOLUSDT --interval 60
+              ```
+            - Bot sẽ tự động quét mỗi 60 giây cho cả 3 coin và tự động ghi kết quả vào `data/paper_trading_state.json`.
+
+            **2. Treo Miễn Phí 100% bằng GitHub Actions (Tắt máy tính hoàn toàn 24/7)**
+            - Hệ thống đã tích hợp sẵn workflow `.github/workflows/forward_test_runner.yml`.
+            - Cứ mỗi 30 phút, máy chủ đám mây của GitHub sẽ tự thức dậy, quét giá Binance cho BTC, ETH, SOL, tự động khớp lệnh / chốt lời / cắt lỗ, và lưu lại kết quả.
+            - Bạn có thể tắt máy, đi ngủ, hoặc đi du lịch; bot vẫn tự động giao dịch giả lập trên thị trường thật.
+            """
+        )
 
 # --- Footer Disclaimer ---
 st.markdown("---")
