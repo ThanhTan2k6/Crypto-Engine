@@ -8,6 +8,8 @@ import logging
 import os
 from typing import Any
 
+from src.agents.state import SpecialistDossier
+
 logger = logging.getLogger(__name__)
 
 
@@ -189,9 +191,9 @@ class LLMReasoningClient:
     async def generate_socratic_critique(
         self,
         symbol: str,
-        spot_dossier: dict[str, Any] | None,
-        futures_dossier: dict[str, Any] | None,
-        whale_dossier: dict[str, Any] | None,
+        spot_dossier: SpecialistDossier | dict[str, Any] | None,
+        futures_dossier: SpecialistDossier | dict[str, Any] | None,
+        whale_dossier: SpecialistDossier | dict[str, Any] | None,
         spot_quant: dict[str, Any] | None,
         futures_quant: dict[str, Any] | None,
         whale_quant: dict[str, Any] | None,

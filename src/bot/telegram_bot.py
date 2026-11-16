@@ -123,7 +123,11 @@ async def audit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
         alert = audit_state.get("telegram_alert_payload")
-        text = alert.get("text") if alert else "Không thể khởi tạo báo cáo thẩm định."
+        text: str = (
+            str(alert.get("text"))
+            if alert and alert.get("text")
+            else "Không thể khởi tạo báo cáo thẩm định."
+        )
 
         if loading_msg:
             await loading_msg.edit_text(text, parse_mode=ParseMode.MARKDOWN)

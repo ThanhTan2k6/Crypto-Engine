@@ -3,7 +3,7 @@ LangGraph Multi-Agent StateGraph Workflow for CryptoIntel-Engine.
 Orchestrates parallel specialist analysis, fan-in barrier, Socratic cross-examination, and synthesis.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
 
@@ -82,5 +82,5 @@ async def run_crypto_audit(
         hard_red_flags=hard_red_flags,
     )
 
-    final_state: CryptoIntelState = await audit_workflow_app.ainvoke(initial_state)
+    final_state: CryptoIntelState = cast(CryptoIntelState, await audit_workflow_app.ainvoke(initial_state))
     return final_state
