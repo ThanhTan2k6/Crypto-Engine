@@ -1,10 +1,11 @@
 name: 24/7 Automated Forward-Test Runner
 
+# on:
+#   schedule:
+#     # Runs every 30 minutes 24/7/365 without requiring any local computer on
+#     - cron: '*/30 * * * *'
 on:
-  schedule:
-    # Runs every 30 minutes 24/7/365 without requiring any local computer on
-    - cron: '*/30 * * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub web UI
+  workflow_dispatch: # Allows manual trigger only from GitHub web UI
 
 jobs:
   run-bot-tick:
