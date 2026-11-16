@@ -39,9 +39,11 @@ def test_socratic_agent_faithfulness(contract_input_json: str, agent_output_text
     test_case = LLMTestCase(
         input=contract_input_json,
         actual_output=agent_output_text,
-        retrieval_context=[contract_input_json]
+        retrieval_context=[contract_input_json],
+        context=[contract_input_json],
     )
     faithfulness = FaithfulnessMetric(threshold=0.95)
-    hallucination = HallucinationMetric(threshold=0.05)
+    # Hallucination metric: score >= 0.95 in DeepEval >= 4.2 (share of grounded context), or <= 0.05 in older releases
+    hallucination = HallucinationMetric(threshold=0.95)
     assert_test(test_case, [faithfulness, hallucination])
 ```

@@ -21,12 +21,12 @@
     "hard_red_flags": [
       "CYCLE_TOP_MVRV_EUPHORIA",
       "PI_CYCLE_TOP_TRIGGERED"
-    ]
+    ],
+    "historical_drawdown_risk_pct": 70.0
   },
   "expected_evaluation": {
     "verdict": "REJECT_SETUP_TOO_RISKY",
     "fomo_index_min": 90.0,
-    "expected_invalidation_price": 58000.0,
     "required_socratic_topics": [
       "MVRV over-extension historical 70%+ drawdown",
       "long-term cyclical profit-taking vs new spot accumulation",

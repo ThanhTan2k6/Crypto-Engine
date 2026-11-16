@@ -27,11 +27,11 @@ def test_mayer_multiple():
 
 def test_pi_cycle_top_indicator():
     engine = SpotCycleEngine()
-    # 111d SMA: 35k (*2 = 70k), 350d SMA: 68k -> 70k >= 68k (Triggered)
-    assert engine.evaluate_pi_cycle_top(35000.0, 68000.0) is True
+    # 111d SMA: 72k, 350d SMA: 35k (*2 = 70k) -> 72k >= 70k (Triggered)
+    assert engine.evaluate_pi_cycle_top(72000.0, 35000.0) is True
 
-    # 111d SMA: 25k (*2 = 50k), 350d SMA: 68k -> 50k < 68k (Not triggered)
-    assert engine.evaluate_pi_cycle_top(25000.0, 68000.0) is False
+    # 111d SMA: 35k, 350d SMA: 68k (*2 = 136k) -> 35k < 136k (Not triggered)
+    assert engine.evaluate_pi_cycle_top(35000.0, 68000.0) is False
 
 
 def test_cycle_regime_classification():
@@ -79,3 +79,27 @@ def test_full_spot_cycle_evaluation():
     assert schema.cycle_regime == CycleRegime.LATE_BULL_OVERHEATED
     assert schema.dca_zone_conservative < schema.current_price
     assert schema.take_profit_target_1 > schema.current_price
+
+
+def test_sub_cent_token_preserves_precision():
+    engine = SpotCycleEngine()
+    schema = engine.evaluate(
+        symbol="PEPEUSDT",
+        current_price=0.000012,
+        market_cap=5000000000.0,
+        realized_cap=3000000000.0,
+        std_market_cap=1000000000.0,
+        sma_200d=0.000010,
+        sma_200w=0.000008,
+        sma_111d=0.000014,
+        sma_350d=0.000009,
+    )
+    assert schema.symbol == "PEPEUSDT"
+    assert schema.current_price == 0.000012
+    assert schema.dca_zone_conservative > 0.0
+    assert schema.dca_zone_moderate > 0.0
+    assert schema.dca_zone_aggressive > 0.0
+    assert schema.take_profit_target_1 > 0.0
+    assert schema.take_profit_target_2 > 0.0
+    assert schema.take_profit_target_3 > 0.0
+

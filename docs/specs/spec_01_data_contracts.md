@@ -24,7 +24,7 @@ class WhaleSentiment(str, Enum):
     NEUTRAL = "NEUTRAL"
 
 class MarketMetrics(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     symbol: str = Field(..., description="Trading pair, e.g., BTCUSDT")
     timestamp: datetime
@@ -39,7 +39,7 @@ class MarketMetrics(BaseModel):
     derivatives_risk_level: str = Field(..., description="LOW, ELEVATED, EXTREME_LIQUIDATION_RISK")
 
 class MacroMetrics(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     timestamp: datetime
     fed_funds_rate: float = Field(..., ge=0.0)
@@ -52,7 +52,7 @@ class MacroMetrics(BaseModel):
     macro_score: float = Field(..., ge=-10.0, le=10.0, description="Normalized score: <-3 Risk-off, >+3 Risk-on")
 
 class WhaleFlowMetrics(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     symbol: str
     timestamp: datetime
@@ -64,7 +64,7 @@ class WhaleFlowMetrics(BaseModel):
     whale_sentiment: WhaleSentiment
 
 class DeterministicSignals(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     symbol: str
     timestamp: datetime
@@ -76,10 +76,10 @@ class DeterministicSignals(BaseModel):
     hard_red_flags: List[str] = Field(default_factory=list)
 
 class SocraticEvaluationResult(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     fomo_index: float = Field(..., ge=0.0, le=100.0, description="100 = Peak irrational euphoria")
-    fatal_questions: List[str] = Field(..., min_length=3, max_length=3)
+    fatal_socratic_questions: List[str] = Field(..., min_length=3, max_length=3)
     worst_case_invalidation_price: float = Field(..., gt=0.0)
     thesis_flaws: List[str]
     verdict: str = Field(..., description="PROCEED_WITH_CAUTION, SCALE_IN_SPOT, REJECT_SETUP_TOO_RISKY")

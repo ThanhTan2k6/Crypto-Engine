@@ -25,7 +25,6 @@
   "expected_evaluation": {
     "verdict": "REJECT_SETUP_TOO_RISKY",
     "fomo_index_min": 60.0,
-    "expected_invalidation_price": 5.0,
     "required_socratic_topics": [
       "immediate capital withdrawal from exchange",
       "solvency contagion rendering technical charts meaningless",

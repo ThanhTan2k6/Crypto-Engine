@@ -9,6 +9,15 @@ from datetime import UTC, datetime
 from src.ingestion.schemas import FuturesRiskLevel, FuturesSqueezeSchema
 
 
+def _format_price_val(val: float) -> float:
+    """Format price ensuring sub-cent precision (>0) is preserved."""
+    if val <= 0.0:
+        return 0.0
+    if val < 0.01:
+        return round(val, 8)
+    return round(val, 2)
+
+
 class FuturesRiskEngine:
     """Deterministic risk engine for perpetual futures leverage crowding and squeeze detection."""
 
@@ -41,16 +50,25 @@ class FuturesRiskEngine:
 
     @staticmethod
     def calculate_orderbook_imbalance_ratio(
-        bids: list[list[float]], asks: list[list[float]]
+        bids: list[list[float]], asks: list[list[float]], current_price: float | None = None
     ) -> float:
         """
-        Calculate Orderbook Imbalance Ratio (OBIR) within depth:
+        Calculate Orderbook Imbalance Ratio (OBIR) within ±2% depth:
         OBIR = sum(Bid_Volume) / (sum(Bid_Volume) + sum(Ask_Volume))
         - OBIR < 0.35: Thin bid depth; high vulnerability to downside stop sweeps.
         - OBIR > 0.65: Bid heavy; strong absorption.
         """
-        total_bid_vol = sum(q for _, q in bids) if bids else 0.0
-        total_ask_vol = sum(q for _, q in asks) if asks else 0.0
+        if current_price is not None and current_price > 0.0:
+            lower = current_price * 0.98
+            upper = current_price * 1.02
+            filtered_bids = [q for p, q in bids if p >= lower]
+            filtered_asks = [q for p, q in asks if p <= upper]
+        else:
+            filtered_bids = [q for _, q in bids] if bids else []
+            filtered_asks = [q for _, q in asks] if asks else []
+
+        total_bid_vol = sum(filtered_bids)
+        total_ask_vol = sum(filtered_asks)
         total_vol = total_bid_vol + total_ask_vol
         if total_vol <= 0.0:
             return 0.5
@@ -79,9 +97,9 @@ class FuturesRiskEngine:
         - Liquidation Pocket Above: 1.5% above 24h High (Short stop hunt zone)
         - Liquidation Pocket Below: 2.0% below 24h Low (Long stop hunt zone)
         """
-        pocket_above = round(high_24h * 1.015 if high_24h > current_price else current_price * 1.015, 2)
-        pocket_below = round(low_24h * 0.98 if low_24h < current_price else current_price * 0.98, 2)
-        return pocket_above, pocket_below
+        above = high_24h * 1.015 if high_24h > current_price else current_price * 1.015
+        below = low_24h * 0.98 if low_24h < current_price else current_price * 0.98
+        return _format_price_val(above), _format_price_val(below)
 
     def evaluate(
         self,
@@ -102,7 +120,7 @@ class FuturesRiskEngine:
         funding_apr = self.annualize_funding_rate(funding_rate_8h)
         frsi = self.calculate_frsi(funding_apr)
         oi_change = self.calculate_oi_change_pct(open_interest_usd, oi_24h_ago)
-        obir = self.calculate_orderbook_imbalance_ratio(bids, asks)
+        obir = self.calculate_orderbook_imbalance_ratio(bids, asks, current_price=current_price)
         risk_level = self.classify_futures_risk(frsi, oi_change, obir)
         liq_above, liq_below = self.estimate_liquidation_pockets(current_price, high_24h, low_24h)
 

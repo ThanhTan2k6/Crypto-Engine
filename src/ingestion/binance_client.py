@@ -54,22 +54,22 @@ class BinancePublicClient:
             }
 
     async def get_funding_rate(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
-        """Fetch latest funding rate and predicted next funding rate."""
-        url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/fundingRate"
-        params: dict[str, str | int] = {"symbol": symbol.upper(), "limit": 1}
+        """Fetch latest funding rate normalized to 8h equivalent and funding interval."""
+        url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/premiumIndex"
+        params: dict[str, str | int] = {"symbol": symbol.upper()}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             data = resp.json()
-            rate = 0.0
-            funding_time = datetime.now(UTC)
-            if data and len(data) > 0:
-                rate = float(data[0].get("fundingRate", 0.0))
-                funding_time = datetime.fromtimestamp(data[0].get("fundingTime", 0) / 1000.0, tz=UTC)
+            raw_rate = float(data.get("lastFundingRate", 0.0))
+            interval_hours = int(data.get("fundingIntervalHours", 8))
+            rate_8h = raw_rate * (8.0 / interval_hours) if interval_hours > 0 else raw_rate
+            next_funding_time = datetime.fromtimestamp(data.get("nextFundingTime", 0) / 1000.0, tz=UTC)
             return {
                 "symbol": symbol.upper(),
-                "funding_rate_8h": rate,
-                "funding_time": funding_time,
+                "funding_rate_8h": rate_8h,
+                "funding_interval_hours": interval_hours,
+                "funding_time": next_funding_time,
                 "timestamp": datetime.now(UTC),
             }
 

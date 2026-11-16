@@ -9,6 +9,15 @@ from datetime import UTC, datetime
 from src.ingestion.schemas import CycleRegime, SpotCycleValuationSchema
 
 
+def _format_price_val(val: float) -> float:
+    """Format price ensuring sub-cent precision (>0) is preserved."""
+    if val <= 0.0:
+        return 0.0
+    if val < 0.01:
+        return round(val, 8)
+    return round(val, 2)
+
+
 class SpotCycleEngine:
     """Deterministic valuation engine for long-term spot cycle tops, bottoms, and accumulation."""
 
@@ -44,9 +53,10 @@ class SpotCycleEngine:
     @staticmethod
     def evaluate_pi_cycle_top(sma_111d: float, sma_350d: float) -> bool:
         """
-        Pi Cycle Top Indicator: True when (111-day SMA * 2.0) crosses above 350-day SMA.
+        Pi Cycle Top Indicator: True when 111-day SMA crosses above (350-day SMA * 2.0).
+        Historically marks macro cycle peaks with high accuracy.
         """
-        return bool((sma_111d * 2.0) >= sma_350d)
+        return bool(sma_111d >= (sma_350d * 2.0))
 
     @staticmethod
     def classify_cycle_regime(mvrv_zscore: float, mayer_multiple: float) -> CycleRegime:
@@ -72,11 +82,11 @@ class SpotCycleEngine:
         Calculate 3 algorithmic DCA accumulation levels:
         - Zone 1 (Conservative): Current Price * 0.92 (8% pull-back)
         - Zone 2 (Moderate): max(Realized Price, Current Price * 0.85)
-        - Zone 3 (Aggressive / Capitulation Floor): 200W-MA
+        - Zone 3 (Aggressive / Capitulation Floor): 200W-MA (or current_price * 0.70 if sma_200w <= 0)
         """
-        zone_1 = round(current_price * 0.92, 2)
-        zone_2 = round(max(realized_price, current_price * 0.85), 2)
-        zone_3 = round(min(sma_200w, current_price * 0.70), 2)
+        zone_1 = _format_price_val(current_price * 0.92)
+        zone_2 = _format_price_val(max(realized_price, current_price * 0.85))
+        zone_3 = _format_price_val(sma_200w if sma_200w > 0.0 else current_price * 0.70)
         return zone_1, zone_2, zone_3
 
     @staticmethod
@@ -87,9 +97,9 @@ class SpotCycleEngine:
         - TP 2 (Mid-Cycle Extension): Current Price * 1.75 (+75%)
         - TP 3 (Cycle Peak Euphoria): Current Price * 2.50 (+150%)
         """
-        tp_1 = round(current_price * 1.35, 2)
-        tp_2 = round(current_price * 1.75, 2)
-        tp_3 = round(current_price * 2.50, 2)
+        tp_1 = _format_price_val(current_price * 1.35)
+        tp_2 = _format_price_val(current_price * 1.75)
+        tp_3 = _format_price_val(current_price * 2.50)
         return tp_1, tp_2, tp_3
 
     @staticmethod
@@ -132,13 +142,16 @@ class SpotCycleEngine:
         tp_1, tp_2, tp_3 = self.calculate_take_profit_zones(current_price)
         multiplier = self.calculate_recommended_spot_multiplier(regime)
 
+        realized_price_clean = _format_price_val(realized_price)
+        sma_200w_clean = _format_price_val(sma_200w)
+
         return SpotCycleValuationSchema(
             symbol=symbol.upper(),
             timestamp=ts,
             current_price=float(current_price),
             mvrv_zscore=float(mvrv_z),
-            realized_price=float(round(realized_price, 2)),
-            sma_200w=float(round(sma_200w, 2)),
+            realized_price=float(realized_price_clean),
+            sma_200w=float(sma_200w_clean),
             mayer_multiple=float(mayer),
             pi_cycle_top_triggered=bool(pi_top),
             cycle_regime=regime,

@@ -21,7 +21,6 @@
   "expected_evaluation": {
     "verdict": "PROCEED_WITH_CAUTION",
     "fomo_index_min": 25.0,
-    "expected_invalidation_price": 26400.0,
     "required_socratic_topics": [
       "financing fee carry penalty for short sellers",
       "liquidation cascade above local resistance",

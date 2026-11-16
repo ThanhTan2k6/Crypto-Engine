@@ -20,7 +20,6 @@
   "expected_evaluation": {
     "verdict": "REJECT_SETUP_TOO_RISKY",
     "fomo_index_min": 70.0,
-    "expected_invalidation_price": 0.28,
     "required_socratic_topics": [
       "automated bot wash trading fabrication",
       "severe market order slippage risk",

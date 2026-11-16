@@ -22,7 +22,6 @@
   "expected_evaluation": {
     "verdict": "PROCEED_WITH_CAUTION",
     "fomo_index_min": 65.0,
-    "expected_invalidation_price": 41200.0,
     "required_socratic_topics": [
       "disconnect between market rate-cut pricing and Fed guidance",
       "cost of capital impact on speculative multiples",

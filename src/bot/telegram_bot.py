@@ -5,7 +5,13 @@ Implements asynchronous command handling for /start, /audit, /spot, /futures, an
 
 import logging
 import os
+import sys
 from datetime import UTC, datetime
+
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env
+load_dotenv()
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -203,7 +209,7 @@ def run_bot() -> None:
             "TELEGRAM_BOT_TOKEN is not set or using placeholder in .env. "
             "Please configure a valid token from @BotFather."
         )
-        return
+        sys.exit(1)
 
     logger.info("Starting CryptoIntel Telegram Bot...")
     application = ApplicationBuilder().token(token).build()

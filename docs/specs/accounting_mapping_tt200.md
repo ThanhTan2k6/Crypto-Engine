@@ -26,14 +26,17 @@ Tài liệu này chuẩn hóa quy tắc hạch toán và định giá tài sản
 ## 3. Quy tắc Định giá & Trích lập Dự phòng (Valuation & Impairment Rules)
 
 ### 3.1. Phương pháp tính giá xuất kho / thanh lý
-Hệ thống mặc định áp dụng phương pháp **FIFO (Nhập trước - Xuất trước)** hoặc **Bình quân gia quyền di động (Moving Weighted Average)** cho toàn bộ giao dịch mua tích sản:
-$$\text{Cost Basis} = \frac{\sum (\text{Quantity}_i \times \text{Entry Price}_i)}{\sum \text{Quantity}_i}$$
+Hệ thống hỗ trợ 2 phương pháp tính giá vốn riêng biệt:
+- **Phương pháp FIFO (Nhập trước - Xuất trước)**: Mỗi lần xuất bán hoặc thanh lý, hệ thống gán giá vốn của lô mua sớm nhất còn tồn kho; cập nhật lại danh mục các lô mua và số lượng còn lại sau mỗi giao dịch.
+- **Phương pháp Bình quân gia quyền di động (Moving Weighted Average)**: Tính toán lại đơn giá bình quân sau mỗi lần mua mới:
+$$\text{Đơn giá bình quân} = \frac{\text{Tổng giá trị ghi sổ của số lượng còn lại}}{\text{Tổng số lượng tồn còn lại}}$$
 
 ### 3.2. Quy tắc Trích lập Dự phòng (TK 2291)
 Vào cuối mỗi chu kỳ kế toán (ngày cuối tháng/quý):
-$$\text{Mức trích lập dự phòng} = \max(0, \text{Giá gốc ghi sổ} - \text{Giá thị trường hợp lý (Mark Price Binance)})$$
-- Nếu giá trị thị trường giảm xuống dưới giá vốn $\rightarrow$ Ghi nhận Chi phí Tài chính (Nợ TK 635 / Có TK 2291).
-- Nếu giá trị thị trường phục hồi $\rightarrow$ Hoàn nhập dự phòng (Nợ TK 2291 / Có TK 635).
+$$\text{Dự phòng mục tiêu} = \max\Big(0, \, \text{Tổng giá gốc ghi sổ} - (\text{Mark Price Binance} \times \text{Số lượng tồn còn lại})\Big)$$
+$$\text{Biến động trích lập / hoàn nhập} = \text{Dự phòng mục tiêu} - \text{Số dư dự phòng hiện tại (TK 2291)}$$
+- Nếu biến động $> 0$: Trích lập bổ sung vào Chi phí Tài chính (Nợ TK 635 / Có TK 2291).
+- Nếu biến động $< 0$: Hoàn nhập khoản dự phòng thừa (Nợ TK 2291 / Có TK 635).
 
 ### 3.3. Tách biệt tuyệt đối Realized vs Unrealized PnL
 - **Chỉ ghi nhận vào Doanh thu Tài chính (TK 515)** khi vị thế đã được đóng hoàn toàn sang Tiền pháp định hoặc Stablecoin (USDT/USDC).

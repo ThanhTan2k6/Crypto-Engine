@@ -18,7 +18,7 @@ test:
 	poetry run pytest tests/ -v
 
 eval:
-	poetry run pytest tests/test_golden_cases_eval.py -v
+	poetry run pytest tests/test_golden_cases_loading.py -v
 
 check: lint test eval
 

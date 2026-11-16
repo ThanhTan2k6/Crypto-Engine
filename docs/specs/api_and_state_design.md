@@ -6,44 +6,57 @@
 from typing import TypedDict, List, Dict, Any, Optional
 from datetime import datetime
 
-class AgentDossier(TypedDict):
-    agent_name: str
-    assessment: str
-    risk_score: float
-    key_findings: List[str]
+class SpecialistDossier(TypedDict):
+    agent_id: str
+    verdict: str
+    confidence_score: float
+    risk_level: str
+    key_observations: List[str]
+    critical_vulnerabilities: List[str]
     timestamp: datetime
 
 class CryptoIntelState(TypedDict):
-    # Ingestion & Deterministic Inputs
+    # Immutable Quant Ingestion Contracts
     symbol: str
     timestamp: datetime
-    raw_quant_signals: Dict[str, Any]       # Validated DeterministicSignals dict
+    execution_mode: str               # "MODE_SPOT", "MODE_FUTURES", or "DUAL_AUDIT"
     
-    # User Context (Optional trade proposal)
-    proposed_action: Optional[str]          # e.g., "LONG_BTC_5X", "DCA_BUY_SPOT"
-    proposed_entry_price: Optional[float]
+    # Pre-calculated Quant Schemas (from src/engine/)
+    spot_valuation_data: Optional[Dict[str, Any]]    # SpotCycleValuationSchema
+    futures_squeeze_data: Optional[Dict[str, Any]]   # FuturesSqueezeSchema
+    etf_flow_data: Optional[Dict[str, Any]]          # ETFNetflowSchema
+    whale_flow_data: Optional[Dict[str, Any]]        # WhaleFlowSchema
+    token_vesting_data: Optional[Dict[str, Any]]     # TokenVestingSchema
     
-    # Multi-Agent Outputs
-    macro_dossier: Optional[AgentDossier]
-    whale_dossier: Optional[AgentDossier]
-    derivatives_dossier: Optional[AgentDossier]
+    # User Trade Context
+    proposed_action: Optional[str]                   # e.g., "LONG_BTC_5X", "DCA_BUY_SPOT"
+    proposed_entry: Optional[float]
+    time_horizon_days: int
     
-    # Socratic Refutation & Verdict
-    socratic_verdict: Optional[Dict[str, Any]] # Validated SocraticEvaluationResult dict
-    fatal_questions: List[str]
-    worst_case_invalidation: float
+    # Parallel Specialist Nodes Output
+    spot_dossier: Optional[SpecialistDossier]
+    futures_dossier: Optional[SpecialistDossier]
+    whale_etf_dossier: Optional[SpecialistDossier]
+    
+    # Socratic Devil's Advocate Inquisitor
     fomo_index: float
+    fatal_socratic_questions: List[str]             # Exactly 3 Fatal Questions
+    worst_case_invalidation_price: float
+    thesis_refutations: List[str]
+    anti_fomo_verdict: str
     
-    # Execution Metadata
+    # Delivery Payloads & Metadata
+    investment_memo: Optional[Dict[str, Any]]
+    telegram_alert_payload: Optional[Dict[str, Any]]
     errors: List[str]
     trace_id: str
 ```
 
 ### Graph Lifecycle & Transitions
-1. `node_supervisor`: Ingests and validates inputs $\rightarrow$ Routes in parallel to `[node_macro, node_whale, node_derivatives]`.
-2. `fan_in_barrier`: Waits for all 3 analytical dossiers to complete.
+1. `node_supervisor`: Ingests and validates inputs $\rightarrow$ Routes in parallel to `[node_spot_specialist, node_futures_specialist, node_whale_specialist]`.
+2. `fan_in_barrier`: Waits for all 3 analytical specialist dossiers to complete.
 3. `node_socratic`: Synthesizes dossiers + challenges the trade idea $\rightarrow$ Emits 3 Fatal Questions and FOMO index.
-4. `node_synthesis`: Final decision formatting and persistence $\rightarrow$ `END`.
+4. `node_synthesis`: Final decision formatting, alert persistence $\rightarrow$ `END`.
 
 ---
 

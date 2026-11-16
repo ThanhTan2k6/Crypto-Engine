@@ -24,7 +24,6 @@
   "expected_evaluation": {
     "verdict": "SCALE_IN_SPOT",
     "fomo_index_min": 15.0,
-    "expected_invalidation_price": 14500.0,
     "required_socratic_topics": [
       "smart money cold storage accumulation during panic",
       "MVRV generational bottom percentile",

@@ -1,7 +1,7 @@
 # Technical Specification 03: The 10 Golden Historical Stress-Test Cases & DeepEval Harness
 
 ## 1. Automated Evaluation Framework (DeepEval CI/CD)
-To guarantee zero-hallucination and ensure the Socratic Devil's Advocate Agent maintains radical anti-sycophantic rigor, all modifications are continuously tested against **10 Historical Golden Cases**.
+To guarantee zero-hallucination and ensure the Socratic Devil's Advocate Agent maintains radical anti-sycophantic rigor, the planned DeepEval gate will test agent responses against **10 Historical Golden Cases**. Current CI validates golden case fixture schemas and deterministic quant logic.
 
 ### Core DeepEval Quality Gate Metrics:
 1. **Faithfulness Metric ($\ge 0.95$)**: Every factual claim made in the Socratic Critique must be strictly derivable from the input JSON.

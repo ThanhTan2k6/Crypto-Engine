@@ -84,3 +84,35 @@ def test_full_futures_risk_evaluation():
     assert schema.frsi_score > 90.0
     assert schema.futures_risk_level == FuturesRiskLevel.EXTREME_LONG_LIQUIDATION_RISK
     assert schema.orderbook_imbalance_ratio == 0.25
+
+
+def test_orderbook_in_band_filtering():
+    engine = FuturesRiskEngine()
+    # current_price = 100. Bids at 99 (vol 1) and 50 (vol 1000). Asks at 101 (vol 9).
+    # ±2% band: bids >= 98, asks <= 102.
+    # Distant bid at 50 is ignored -> bids in band = 1, asks in band = 9 -> obir = 1 / 10 = 0.10
+    bids = [[99.0, 1.0], [50.0, 1000.0]]
+    asks = [[101.0, 9.0]]
+    obir = engine.calculate_orderbook_imbalance_ratio(bids, asks, current_price=100.0)
+    assert obir == 0.10
+
+
+def test_sub_cent_futures_token():
+    engine = FuturesRiskEngine()
+    schema = engine.evaluate(
+        symbol="SHIBUSDT",
+        current_price=0.001,
+        open_interest_usd=5000000.0,
+        oi_24h_ago=4800000.0,
+        funding_rate_8h=0.0001,
+        long_short_ratio=1.05,
+        bids=[[0.00099, 1000.0]],
+        asks=[[0.00101, 1000.0]],
+        high_24h=0.0011,
+        low_24h=0.0009,
+    )
+    assert schema.symbol == "SHIBUSDT"
+    assert schema.current_price == 0.001
+    assert schema.liquidation_pocket_above > 0.0
+    assert schema.liquidation_pocket_below > 0.0
+

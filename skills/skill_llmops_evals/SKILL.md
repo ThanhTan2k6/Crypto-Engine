@@ -19,7 +19,7 @@ from deepeval.test_case import LLMTestCaseParams
 def test_socratic_agent_faithfulness_gc01(quant_luna_contract, agent_output):
     test_case = LLMTestCase(
         input=quant_luna_contract.model_dump_json(),
-        actual_output=agent_output["socratic_verdict"]["fatal_questions"],
+        actual_output=agent_output["socratic_verdict"]["fatal_socratic_questions"],
         retrieval_context=[quant_luna_contract.model_dump_json()]
     )
     

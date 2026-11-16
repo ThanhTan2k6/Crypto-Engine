@@ -28,16 +28,28 @@ class BybitPublicClient:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             data = resp.json()
+            if data.get("retCode") != 0:
+                raise RuntimeError(
+                    f"Bybit API error: {data.get('retMsg', 'Unknown error')} (code {data.get('retCode')})"
+                )
             result_list = data.get("result", {}).get("list", [])
             if not result_list:
                 raise ValueError(f"No Bybit ticker returned for {symbol}")
             item = result_list[0]
+            raw_funding = float(item.get("fundingRate", 0.0))
+            # Normalize to 8h interval if exchange provides a different funding interval
+            funding_interval_hour = int(item.get("fundingIntervalHour", 8))
+            funding_rate_8h = (
+                raw_funding * (8.0 / funding_interval_hour)
+                if funding_interval_hour > 0
+                else raw_funding
+            )
             return {
                 "symbol": symbol.upper(),
                 "last_price": float(item.get("lastPrice", 0.0)),
                 "volume_24h_usd": float(item.get("turnover24h", 0.0)),
                 "open_interest_usd": float(item.get("openInterestValue", 0.0)),
-                "funding_rate_8h": float(item.get("fundingRate", 0.0)),
+                "funding_rate_8h": funding_rate_8h,
                 "timestamp": datetime.now(UTC),
             }
 
@@ -48,9 +60,14 @@ class BybitPublicClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
-            data = resp.json().get("result", {})
-            bids = [[float(p), float(q)] for p, q in data.get("b", [])]
-            asks = [[float(p), float(q)] for p, q in data.get("a", [])]
+            data = resp.json()
+            if data.get("retCode") != 0:
+                raise RuntimeError(
+                    f"Bybit API error: {data.get('retMsg', 'Unknown error')} (code {data.get('retCode')})"
+                )
+            result = data.get("result", {})
+            bids = [[float(p), float(q)] for p, q in result.get("b", [])]
+            asks = [[float(p), float(q)] for p, q in result.get("a", [])]
             return {
                 "symbol": symbol.upper(),
                 "bids": bids,

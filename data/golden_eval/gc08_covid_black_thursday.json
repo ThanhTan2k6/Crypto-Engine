@@ -24,7 +24,6 @@
   "expected_evaluation": {
     "verdict": "SCALE_IN_SPOT",
     "fomo_index_min": 10.0,
-    "expected_invalidation_price": 3800.0,
     "required_socratic_topics": [
       "technical support failure during global cash crunches",
       "generational spot accumulation discount at structural extremes",

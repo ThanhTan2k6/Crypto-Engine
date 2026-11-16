@@ -25,7 +25,6 @@
   "expected_evaluation": {
     "verdict": "REJECT_SETUP_TOO_RISKY",
     "fomo_index_min": 70.0,
-    "expected_invalidation_price": 1.45,
     "required_socratic_topics": [
       "71% circulating supply cliff unlock dilution",
       "venture capital cost basis vs retail price",

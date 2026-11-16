@@ -33,8 +33,8 @@ $$\text{200W-MA Ratio} = \frac{\text{Current Price}}{\text{200-Week SMA}}$$
 ---
 
 ### 2.3. Pi Cycle Top Indicator
-$$\text{Pi High SMA} = \text{SMA}_{111}(P) \times 2.0, \quad \text{Pi Low SMA} = \text{SMA}_{350}(P)$$
-- **Cycle Top Alert**: Triggered when $\text{SMA}_{111} \times 2.0$ crosses above $\text{SMA}_{350}$.
+$$\text{Pi High SMA} = \text{SMA}_{350}(P) \times 2.0, \quad \text{Pi Low SMA} = \text{SMA}_{111}(P)$$
+- **Cycle Top Alert**: Triggered when $\text{SMA}_{111}$ crosses above $\text{SMA}_{350} \times 2.0$.
 
 ---
 
@@ -55,8 +55,8 @@ $$\text{Take-Profit 3 (Cycle Peak)} = P_{\text{current}} \times 2.50$$
 ### 3.1. Funding Rate Squeeze Index (FRSI)
 $$\text{APR}_{\text{funding}} = \text{FR}_{8h} \times 3 \times 365 \times 100\%$$
 $$\text{FRSI} = \text{clip}\left(\frac{\text{APR}_{\text{funding}}}{100.0} \times 50.0 + 50.0, \, 0.0, \, 100.0\right)$$
-- **$\text{FRSI} \ge 85.0$ ($\text{APR} > +75\%$)**: Extreme Long Squeeze hazard. Leveraged longs pay excessive carry bleed.
-- **$\text{FRSI} \le 20.0$ ($\text{APR} < -30\%$)**: Extreme Short Squeeze hazard. Short seller crowding.
+- **$\text{FRSI} \ge 85.0$ ($\text{APR} \ge +70\%$)**: Extreme Long Squeeze hazard. Leveraged longs pay excessive carry bleed.
+- **$\text{FRSI} \le 20.0$ ($\text{APR} \le -60\%$)**: Extreme Short Squeeze hazard. Short seller crowding.
 
 ---
 
