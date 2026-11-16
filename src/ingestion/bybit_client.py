@@ -44,7 +44,7 @@ class BybitPublicClient:
     async def get_orderbook(self, symbol: str = "BTCUSDT", limit: int = 50) -> dict[str, Any]:
         """Fetch orderbook depth from Bybit v5."""
         url = f"{BYBIT_BASE_URL}/v5/market/orderbook"
-        params = {"category": "linear", "symbol": symbol.upper(), "limit": limit}
+        params: dict[str, str | int] = {"category": "linear", "symbol": symbol.upper(), "limit": limit}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()

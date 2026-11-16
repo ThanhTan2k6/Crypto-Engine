@@ -29,7 +29,7 @@ class FredMacroClient:
             logger.warning("FRED_API_KEY not configured. Returning offline baseline for %s.", series_id)
             return self._get_offline_fallback(series_id)
 
-        params = {
+        params: dict[str, str | int] = {
             "series_id": series_id,
             "api_key": self.api_key,
             "file_type": "json",

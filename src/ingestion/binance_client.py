@@ -56,7 +56,7 @@ class BinancePublicClient:
     async def get_funding_rate(self, symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Fetch latest funding rate and predicted next funding rate."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/fundingRate"
-        params = {"symbol": symbol.upper(), "limit": 1}
+        params: dict[str, str | int] = {"symbol": symbol.upper(), "limit": 1}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
@@ -76,7 +76,7 @@ class BinancePublicClient:
     async def get_orderbook_depth(self, symbol: str = "BTCUSDT", limit: int = 50) -> dict[str, Any]:
         """Fetch orderbook top bids and asks to calculate orderbook depth and imbalance."""
         url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/depth"
-        params = {"symbol": symbol.upper(), "limit": limit}
+        params: dict[str, str | int] = {"symbol": symbol.upper(), "limit": limit}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
