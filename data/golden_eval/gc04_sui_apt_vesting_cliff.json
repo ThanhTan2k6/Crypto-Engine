@@ -1,0 +1,35 @@
+{
+  "case_id": "GC-04",
+  "name": "Low Float / High FDV Predatory Vesting Cliff",
+  "historical_period": "2023 / 2024 VC Token Launches",
+  "symbol": "SUIUSDT",
+  "scenario_description": "Venture-backed token trading with only 7% circulating supply, FDV/Market Cap ratio of 14.5, and an impending unlock of $900M worth of tokens scheduled in 5 days.",
+  "quant_payload": {
+    "current_price": 1.85,
+    "circulating_supply": 700000000.0,
+    "total_supply": 10000000000.0,
+    "circulating_pct": 7.0,
+    "market_cap_usd": 1295000000.0,
+    "fdv_usd": 18500000000.0,
+    "fdv_mc_ratio": 14.28,
+    "next_unlock_amount_usd": 920000000.0,
+    "next_unlock_pct_of_circulating": 71.04,
+    "dilution_risk": "HIGH_PREDATORY_UNLOCK",
+    "annualized_funding_rate": 45.0,
+    "frsi_score": 72.5,
+    "hard_red_flags": [
+      "PREDATORY_FDV_UNLOCK_CLIFF",
+      "HYPER_DILUTION_RISK"
+    ]
+  },
+  "expected_evaluation": {
+    "verdict": "REJECT_SETUP_TOO_RISKY",
+    "fomo_index_min": 70.0,
+    "expected_invalidation_price": 1.45,
+    "required_socratic_topics": [
+      "71% circulating supply cliff unlock dilution",
+      "venture capital cost basis vs retail price",
+      "structural impossibility of holding spot value through unlock"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cryptointel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  engine-app:
+    build: .
+    container_name: cryptointel-engine
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    restart: unless-stopped
+
+  telegram-bot:
+    build: .
+    container_name: cryptointel-bot
+    env_file:
+      - .env
+    depends_on:
+      - engine-app
+      - redis
+    volumes:
+      - .:/app
+    command: ["poetry", "run", "python", "-m", "src.bot.telegram_bot"]
+    restart: unless-stopped
+
+volumes:
+  redis_data:
