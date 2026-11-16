@@ -16,6 +16,8 @@ from src.agents.nodes import (
     whale_node,
 )
 from src.agents.state import CryptoIntelState, create_initial_state
+from src.llmops.cache import audit_cache
+from src.llmops.langfuse_tracer import llmops_tracer
 
 
 def build_crypto_audit_graph() -> Any:
@@ -46,6 +48,17 @@ def build_crypto_audit_graph() -> Any:
 audit_workflow_app = build_crypto_audit_graph().compile()
 
 
+def strip_transient_fields(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Recursively strip non-deterministic timestamp and latency fields for cache hashing."""
+    if not isinstance(payload, dict):
+        return payload
+    return {
+        k: strip_transient_fields(v) if isinstance(v, dict) else v
+        for k, v in payload.items()
+        if k not in ["timestamp", "generated_at", "execution_latency_ms"]
+    }
+
+
 async def run_crypto_audit(
     symbol: str,
     execution_mode: str = "DUAL_AUDIT",
@@ -58,8 +71,26 @@ async def run_crypto_audit(
     proposed_entry: float | None = None,
     time_horizon_days: int = 30,
     hard_red_flags: list[str] | None = None,
+    use_cache: bool = True,
 ) -> CryptoIntelState:
     """Execute end-to-end multi-agent audit through the compiled LangGraph pipeline."""
+    payload_hash = audit_cache.compute_payload_hash({
+        "spot": strip_transient_fields(spot_valuation_data),
+        "futures": strip_transient_fields(futures_squeeze_data),
+        "whale": strip_transient_fields(whale_flow_data),
+        "etf": strip_transient_fields(etf_flow_data),
+        "vesting": strip_transient_fields(token_vesting_data),
+        "action": proposed_action,
+        "entry": proposed_entry,
+        "horizon": time_horizon_days,
+        "flags": hard_red_flags,
+    })
+
+    if use_cache:
+        cached_audit = await audit_cache.get("audit", f"{symbol.upper()}:{execution_mode}", payload_hash)
+        if cached_audit is not None:
+            return cast(CryptoIntelState, cached_audit)
+
     initial_state = create_initial_state(
         symbol=symbol,
         execution_mode=execution_mode,
@@ -74,5 +105,40 @@ async def run_crypto_audit(
         hard_red_flags=hard_red_flags,
     )
 
-    final_state: CryptoIntelState = cast(CryptoIntelState, await audit_workflow_app.ainvoke(initial_state))
+    trace_id = initial_state["trace_id"]
+    llmops_tracer.trace_audit_start(
+        trace_id=trace_id,
+        symbol=symbol,
+        execution_mode=execution_mode,
+        proposed_action=proposed_action,
+    )
+
+    try:
+        final_state: CryptoIntelState = cast(CryptoIntelState, await audit_workflow_app.ainvoke(initial_state))
+        llmops_tracer.trace_audit_end(
+            trace_id=trace_id,
+            anti_fomo_verdict=final_state.get("anti_fomo_verdict", "UNKNOWN"),
+            fomo_index=final_state.get("fomo_index", 0.0),
+            fatal_questions=final_state.get("fatal_socratic_questions", []),
+            errors=final_state.get("errors"),
+        )
+    except Exception as e:
+        llmops_tracer.trace_audit_end(
+            trace_id=trace_id,
+            anti_fomo_verdict="REJECT_SETUP_TOO_RISKY",
+            fomo_index=100.0,
+            fatal_questions=[],
+            errors=[str(e)],
+        )
+        raise
+
+    if use_cache and not final_state.get("errors"):
+        await audit_cache.set(
+            "audit",
+            f"{symbol.upper()}:{execution_mode}",
+            dict(final_state),
+            ttl_seconds=300,
+            payload_hash=payload_hash,
+        )
+
     return final_state
