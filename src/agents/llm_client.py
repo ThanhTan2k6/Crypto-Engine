@@ -351,6 +351,10 @@ class LLMReasoningClient:
                 else max(0.0, dca3)
             )
 
+        is_spot_action = proposed_action is not None and any(
+            kw in proposed_action.upper() for kw in ["SPOT", "DCA", "ACCUMULATE"]
+        )
+
         # Formulate Exactly 3 Fatal Socratic Cross-Examinations
         q1 = (
             f"Khi MVRV Z-Score đang ở mức {mvrv:.2f} và vùng tích sản an toàn là "
@@ -360,10 +364,17 @@ class LLMReasoningClient:
             f"Trong 24h qua, sàn ghi nhận Netflow ${netflow / 1e6:,.1f}M với tỷ lệ Orderbook Imbalance {obir:.2f}. "
             f"Liệu bạn có đang hành động theo cảm xúc để trở thành thanh khoản rút lui (exit liquidity) cho các dòng tiền tổ chức?"
         )
-        q3 = (
-            f"Funding Rate đang ở mức APR {funding_apr:.1f}% (FRSI {frsi:.1f}) với cụm dừng lỗ thanh lý tiềm năng tại "
-            f"${invalidation_price:g}. Vị thế của bạn có chịu đựng được một cú quét thanh lý đòn bẩy đột ngột trước khi xác nhận xu hướng không?"
-        )
+        if is_spot_action:
+            q3 = (
+                f"Kế hoạch tích sản DCA của bạn dự kiến chia thành bao nhiêu đợt và trong thời gian bao lâu? "
+                f"Nếu thị trường bước vào giai đoạn tái tích lũy kéo dài 3-6 tháng quanh vùng ${dca3:g}, "
+                f"bạn có sẵn sàng nguồn tiền nhàn rỗi để tiếp tục kỷ luật gom hàng mà không bị áp lực bán tháo non?"
+            )
+        else:
+            q3 = (
+                f"Funding Rate đang ở mức APR {funding_apr:.1f}% (FRSI {frsi:.1f}) với cụm dừng lỗ thanh lý tiềm năng tại "
+                f"${invalidation_price:g}. Vị thế của bạn có chịu đựng được một cú quét thanh lý đòn bẩy đột ngột trước khi xác nhận xu hướng không?"
+            )
 
         return {
             "fomo_index": fomo_index,

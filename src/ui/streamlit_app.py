@@ -2,7 +2,8 @@
 Streamlit Web Dashboard for CryptoIntel-Engine.
 Simplified, clean, and professional FinTech Decision-Support Copilot.
 Features:
-- Socratic Devil's Advocate Anti-FOMO Traffic Light Verdict
+- Live Binance Public API Integration (Real-Time Price & Funding Rate)
+- Socratic Devil's Advocate Anti-FOMO Traffic Light Verdict tailored to Spot vs Futures
 - Algorithmic Spot DCA Accumulation & Take-Profit Targets
 - Real-time Futures Leverage Squeeze & Liquidation Pocket Visuals
 - Vietnamese Circular 200/2014/TT-BTC Accounting & Impairment Balance Sheet
@@ -12,6 +13,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -24,6 +26,7 @@ from src.engine.accounting_tt200 import (
     TT200AccountCode,
 )
 from src.engine.core_quant import CoreQuantEngine, get_symbol_market_profile
+from src.ingestion.binance_client import BinancePublicClient
 
 # Page Configuration
 st.set_page_config(
@@ -37,59 +40,59 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Global Typography & Background */
     .block-container {
-        padding-top: 1.8rem;
-        padding-bottom: 2.5rem;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
     }
-    /* Brand Header */
     .brand-header {
         background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        padding: 20px 24px;
-        margin-bottom: 20px;
+        padding: 18px 24px;
+        margin-bottom: 16px;
     }
     .brand-title {
-        font-size: 1.65rem;
+        font-size: 1.55rem;
         font-weight: 700;
         color: #f9fafb;
         margin: 0;
     }
     .brand-subtitle {
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         color: #9ca3af;
         margin-top: 4px;
         margin-bottom: 0;
     }
-    /* Metric Cards */
-    .ci-card {
-        background: rgba(31, 41, 55, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Metric Cards that never truncate */
+    .ci-metric-card {
+        background: rgba(31, 41, 55, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 10px;
-        padding: 16px;
-        margin-bottom: 12px;
+        padding: 14px 16px;
+        text-align: left;
     }
-    .ci-card-title {
-        font-size: 0.82rem;
+    .ci-metric-label {
+        font-size: 0.8rem;
         color: #9ca3af;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        font-weight: 500;
         margin-bottom: 4px;
     }
-    .ci-card-value {
-        font-size: 1.45rem;
+    .ci-metric-val {
+        font-size: 1.4rem;
         font-weight: 700;
-        color: #f3f4f6;
+        color: #f9fafb;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .ci-card-sub {
-        font-size: 0.8rem;
-        color: #6b7280;
-        margin-top: 2px;
+    .ci-metric-sub {
+        font-size: 0.76rem;
+        color: #60a5fa;
+        margin-top: 3px;
     }
     /* Traffic Light Banners */
     .verdict-red {
-        background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(153, 27, 27, 0.25) 100%);
+        background: linear-gradient(135deg, rgba(220, 38, 38, 0.18) 0%, rgba(153, 27, 27, 0.28) 100%);
         border: 1px solid #ef4444;
         border-radius: 10px;
         padding: 16px 20px;
@@ -97,7 +100,7 @@ st.markdown(
         margin-bottom: 16px;
     }
     .verdict-yellow {
-        background: linear-gradient(135deg, rgba(217, 119, 6, 0.15) 0%, rgba(180, 83, 9, 0.25) 100%);
+        background: linear-gradient(135deg, rgba(217, 119, 6, 0.18) 0%, rgba(180, 83, 9, 0.28) 100%);
         border: 1px solid #f59e0b;
         border-radius: 10px;
         padding: 16px 20px;
@@ -105,7 +108,7 @@ st.markdown(
         margin-bottom: 16px;
     }
     .verdict-green {
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(4, 120, 87, 0.25) 100%);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(4, 120, 87, 0.28) 100%);
         border: 1px solid #10b981;
         border-radius: 10px;
         padding: 16px 20px;
@@ -113,7 +116,7 @@ st.markdown(
         margin-bottom: 16px;
     }
     .socratic-card {
-        background: rgba(30, 41, 59, 0.5);
+        background: rgba(30, 41, 59, 0.55);
         border-left: 4px solid #38bdf8;
         border-radius: 6px;
         padding: 14px 18px;
@@ -125,25 +128,64 @@ st.markdown(
 )
 
 
+async def fetch_live_binance_data(symbol: str) -> dict[str, Any]:
+    """Fetch live ticker and funding rate from public Binance endpoints."""
+    try:
+        client = BinancePublicClient(timeout_seconds=3.0)
+        ticker = await client.get_futures_ticker_24h(symbol)
+        funding = await client.get_funding_rate(symbol)
+        depth = await client.get_orderbook_depth(symbol, limit=20)
+        return {
+            "current_price": ticker["last_price"],
+            "high_24h": ticker["high_price_24h"],
+            "low_24h": ticker["low_price_24h"],
+            "funding_rate_8h": funding["funding_rate_8h"],
+            "bids": depth["bids"],
+            "asks": depth["asks"],
+            "is_live": True,
+        }
+    except (RuntimeError, ConnectionError, TimeoutError, ValueError, OSError, httpx.HTTPError):
+        return {"is_live": False}
+
+
 def perform_quant_and_audit(
     symbol: str,
     analysis_mode: str,
     proposed_trade: str,
     proposed_entry: float,
     time_horizon: int,
-) -> tuple[dict[str, Any], CryptoIntelState, dict[str, Any]]:
-    """Helper to compute deterministic quant and multi-agent audit."""
+) -> tuple[dict[str, Any], CryptoIntelState, dict[str, Any], bool]:
+    """Helper to compute deterministic quant and multi-agent audit with live Binance data."""
     profile = get_symbol_market_profile(symbol)
-    entry_price = proposed_entry if proposed_entry > 0.0 else profile["current_price"]
+
+    # Fetch live Binance data
+    live_data = asyncio.run(fetch_live_binance_data(symbol))
+    is_live = bool(live_data.get("is_live", False))
+
+    current_px = float(live_data.get("current_price", profile["current_price"]))
+    high_px = float(live_data.get("high_24h", current_px * 1.02))
+    low_px = float(live_data.get("low_24h", current_px * 0.98))
+    fr_8h = float(live_data.get("funding_rate_8h", 0.0001))
+    bids = live_data.get("bids")
+    asks = live_data.get("asks")
+
+    circulating = float(profile["circulating_supply"])
+    total_sup = float(profile["total_supply"])
+    market_cap = current_px * circulating
+    fdv = current_px * total_sup
+
+    entry_price = proposed_entry if proposed_entry > 0.0 else current_px
 
     engine = CoreQuantEngine()
-    current_px = profile["current_price"]
     quant_audit = engine.run_full_quant_audit(
         symbol=symbol,
         current_price=current_px,
-        high_24h=current_px * 1.02,
-        low_24h=current_px * 0.98,
-        market_cap=profile["market_cap"],
+        high_24h=high_px,
+        low_24h=low_px,
+        funding_rate_8h=fr_8h,
+        bids=bids,
+        asks=asks,
+        market_cap=market_cap,
         realized_cap=profile["realized_cap"],
         std_market_cap=profile["std_market_cap"],
         sma_200d=profile["sma_200d"],
@@ -152,9 +194,9 @@ def perform_quant_and_audit(
         sma_350d=profile["sma_350d"],
         open_interest_usd=profile["open_interest_usd"],
         oi_24h_ago=profile["oi_24h_ago"],
-        circulating_supply=profile["circulating_supply"],
-        total_supply=profile["total_supply"],
-        fdv_usd=profile["fdv_usd"],
+        circulating_supply=circulating,
+        total_supply=total_sup,
+        fdv_usd=fdv,
     )
 
     spot_dict = quant_audit["spot"].model_dump()
@@ -183,7 +225,7 @@ def perform_quant_and_audit(
             time_horizon_days=time_horizon,
         )
     )
-    return quant_audit, audit_state, profile
+    return quant_audit, audit_state, profile, is_live
 
 
 # --- Top Brand Header ---
@@ -192,7 +234,7 @@ st.markdown(
     <div class="brand-header">
         <div class="brand-title">🛡️ CryptoIntel-Engine | Trợ Lý Thẩm Định Rủi Ro & Chống FOMO</div>
         <div class="brand-subtitle">
-            Toán học định lượng không ảo giác (Zero LLM Arithmetic) • Phản biện Socratic Devil's Advocate • Quản trị danh mục Thông tư 200
+            Toán học định lượng không ảo giác • Phản biện Socratic Devil's Advocate • Quản trị danh mục Thông tư 200
         </div>
     </div>
     """,
@@ -245,8 +287,8 @@ run_button = st.sidebar.button("🚀 Chạy Thẩm Định Lại", type="primary
 
 # Auto-initialize session state if first visit or symbol changed
 if "quant_audit" not in st.session_state or run_button:
-    with st.spinner(f"Đang tính toán định lượng và chất vấn rủi ro cho {selected_symbol}..."):
-        q_audit, a_state, prof = perform_quant_and_audit(
+    with st.spinner(f"Đang kết nối Binance & thẩm định rủi ro cho {selected_symbol}..."):
+        q_audit, a_state, prof, live_status = perform_quant_and_audit(
             symbol=selected_symbol,
             analysis_mode=exec_mode,
             proposed_trade=action_code,
@@ -257,28 +299,46 @@ if "quant_audit" not in st.session_state or run_button:
         st.session_state["audit_state"] = a_state
         st.session_state["profile"] = prof
         st.session_state["active_symbol"] = selected_symbol
+        st.session_state["is_live"] = live_status
 
 quant_audit = st.session_state["quant_audit"]
 audit_state = st.session_state["audit_state"]
 profile = st.session_state["profile"]
 active_symbol = st.session_state.get("active_symbol", selected_symbol)
+is_live_feed = st.session_state.get("is_live", False)
 
 spot_data = quant_audit["spot"]
 futures_data = quant_audit["futures"]
 whale_data = quant_audit["whale"]
 
+# Status Pill
+feed_label = "🟢 Dữ liệu Thời gian thực (Binance Public API)" if is_live_feed else "🟠 Dữ liệu Tham chiếu Chuẩn hóa (Offline Baseline)"
+st.caption(f"Trạng thái nguồn cấp: **{feed_label}**")
+
 # --- Traffic Light Hero Verdict ---
 verdict = audit_state.get("anti_fomo_verdict", "PROCEED_WITH_CAUTION")
 fomo_score = float(audit_state.get("fomo_index", 50.0))
 invalidation_px = float(audit_state.get("worst_case_invalidation_price", spot_data.current_price * 0.95))
+is_spot_plan = "SPOT" in action_code or "DCA" in action_code
 
 if verdict == "REJECT_SETUP_TOO_RISKY":
+    if is_spot_plan:
+        title_text = "🔴 CẢNH BÁO ĐỎ: VÙNG GIÁ QUÁ CAO ĐỂ MUA GOM"
+        body_text = (
+            f"Thị trường đang ở vùng đỉnh chu kỳ (FOMO Index: {fomo_score:.1f}/100, MVRV: {spot_data.mvrv_zscore:.2f}). "
+            f"Với chiến lược Tích sản (Spot DCA), KHÔNG NÊN mua ở vùng hưng phấn này mà hãy kiên nhẫn đợi giá chiết khấu về các vùng DCA sàn bên dưới."
+        )
+    else:
+        title_text = "🔴 CẢNH BÁO ĐỎ: TỪ CHỐI SETUP - RỦI RO ĐÒN BẨY CỰC KỲ CAO"
+        body_text = (
+            f"Thị trường đang ở trạng thái rủi ro bất cân xứng (FOMO Index: {fomo_score:.1f}/100). "
+            f"Tuyệt đối KHÔNG nên mở vị thế mua đuổi hoặc Long đòn bẩy ở vùng giá này do nguy cơ quét bẫy thanh lý hoặc điều chỉnh mạnh."
+        )
     st.markdown(
         f"""
         <div class="verdict-red">
-            <h3 style="margin: 0 0 6px 0; color: #ef4444;">🔴 CẢNH BÁO ĐỎ: TỪ CHỐI SETUP - RỦI RO CỰC KỲ CAO</h3>
-            <b>Kết luận thẩm định:</b> Thị trường đang ở trạng thái rủi ro bất cân xứng (FOMO Index: {fomo_score:.1f}/100).
-            Tuyệt đối KHÔNG nên mở vị thế mua đuổi hoặc Long đòn bẩy ở vùng giá này do nguy cơ quét bẫy thanh lý hoặc điều chỉnh chu kỳ.
+            <h3 style="margin: 0 0 6px 0; color: #ef4444;">{title_text}</h3>
+            <b>Kết luận thẩm định:</b> {body_text}
         </div>
         """,
         unsafe_allow_html=True,
@@ -288,61 +348,106 @@ elif verdict == "SCALE_IN_SPOT":
         f"""
         <div class="verdict-green">
             <h3 style="margin: 0 0 6px 0; color: #10b981;">🟢 TÍN HIỆU XANH: VÙNG TÍCH SẢN TỐT - CHIA VỐN MUA GOM</h3>
-            <b>Kết luận thẩm định:</b> Định giá tài sản đang ở vùng tích lũy an toàn của chu kỳ (FOMO Index: {fomo_score:.1f}/100).
+            <b>Kết luận thẩm định:</b> Định giá tài sản đang ở vùng tích lũy an toàn của chu kỳ (FOMO Index: {fomo_score:.1f}/100, MVRV: {spot_data.mvrv_zscore:.2f}).
             Phù hợp kế hoạch mua gom chia làm nhiều đợt (DCA). Tránh tất tay (All-in) trong một lệnh đơn lẻ.
         </div>
         """,
         unsafe_allow_html=True,
     )
 else:
+    if is_spot_plan:
+        title_text = "🟡 TÍN HIỆU VÀNG: ĐỊNH GIÁ HỢP LÝ - CHIA VỐN DCA THẬN TRỌNG"
+        body_text = (
+            f"Định giá MVRV ở mức cân bằng ({spot_data.mvrv_zscore:.2f}) với FOMO Index đạt {fomo_score:.1f}/100. "
+            f"Bạn có thể kích hoạt kế hoạch Mua gom từng phần (DCA) theo 3 mức giá sàn bên dưới, không nên giải ngân 100% vốn ngay lập tức."
+        )
+    else:
+        title_text = "🟡 CẢNH BÁO VÀNG: THẬN TRỌNG - CHỈ ĐI VỐN THĂM DÒ (10-20%)"
+        body_text = (
+            f"Tín hiệu thị trường đang giằng co và có rủi ro quét râu dừng lỗ (FOMO Index: {fomo_score:.1f}/100). "
+            f"Nếu giải ngân, chỉ phân bổ tỷ trọng nhỏ, đặt dừng lỗ chặt chẽ tại vùng vô hiệu hóa kịch bản."
+        )
     st.markdown(
         f"""
         <div class="verdict-yellow">
-            <h3 style="margin: 0 0 6px 0; color: #f59e0b;">🟡 CẢNH BÁO VÀNG: THẬN TRỌNG - CHỈ ĐI VỐN THĂM DÒ (10-20%)</h3>
-            <b>Kết luận thẩm định:</b> Tín hiệu thị trường đang giằng co và có rủi ro quét râu dừng lỗ (FOMO Index: {fomo_score:.1f}/100).
-            Nếu giải ngân, chỉ phân bổ tỷ trọng nhỏ, đặt dừng lỗ chặt chẽ tại vùng vô hiệu hóa kịch bản.
+            <h3 style="margin: 0 0 6px 0; color: #f59e0b;">{title_text}</h3>
+            <b>Kết luận thẩm định:</b> {body_text}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-# Quick Metrics Row
+# Clean Metric Cards (No Truncation)
+regime_map = {
+    "CYCLE_BOTTOM_CAPITULATION": "Đáy Hoảng Loạn",
+    "EARLY_ACCUMULATION": "Tích Lũy Sớm",
+    "MID_BULL_EXPANSION": "Tăng Trưởng Giữa",
+    "LATE_BULL_OVERHEATED": "Tăng Nóng Cuối",
+    "CYCLE_TOP_EUPHORIA": "Đỉnh Hưng Phấn",
+}
+regime_vn = regime_map.get(spot_data.cycle_regime.value, spot_data.cycle_regime.value)
+
 m1, m2, m3, m4 = st.columns(4)
 with m1:
-    st.metric(f"Giá Thị Trường ({active_symbol})", f"${spot_data.current_price:,.2f}")
+    st.markdown(
+        f"""
+        <div class="ci-metric-card">
+            <div class="ci-metric-label">Giá Thị Trường ({active_symbol})</div>
+            <div class="ci-metric-val">${spot_data.current_price:,.2f}</div>
+            <div class="ci-metric-sub">24h: ${quant_audit['futures'].current_price:,.2f}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 with m2:
-    st.metric(
-        "Chỉ Số FOMO Index",
-        f"{fomo_score:.1f} / 100",
-        help="0-30: Vùng sợ hãi/mua an toàn | 31-70: Thận trọng | 71-100: Hưng phấn cực độ (Cấm fomo)",
+    st.markdown(
+        f"""
+        <div class="ci-metric-card">
+            <div class="ci-metric-label">Chỉ Số FOMO Index</div>
+            <div class="ci-metric-val">{fomo_score:.1f} / 100</div>
+            <div class="ci-metric-sub">{'Thấp (An toàn)' if fomo_score < 40 else ('Trung bình' if fomo_score < 70 else 'Cực cao')}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 with m3:
-    st.metric(
-        "Chu Kỳ Định Giá",
-        spot_data.cycle_regime.value.replace("_", " "),
-        help="Xác định dựa trên MVRV Z-Score và Mayer Multiple",
+    st.markdown(
+        f"""
+        <div class="ci-metric-card">
+            <div class="ci-metric-label">Chu Kỳ Định Giá Spot</div>
+            <div class="ci-metric-val">{regime_vn}</div>
+            <div class="ci-metric-sub">MVRV Z-Score: {spot_data.mvrv_zscore:.2f}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 with m4:
-    inv_str = f"${invalidation_px:,.2f}" if invalidation_px >= 1.0 else f"${invalidation_px:,.6f}"
-    st.metric(
-        "Vùng Dừng Lỗ Kịch Bản",
-        inv_str,
-        help="Mức giá vô hiệu hóa kịch bản tồi tệ nhất nếu giá quét râu",
+    floor_label = "Sàn Đỡ 200W-MA" if is_spot_plan else "Dừng Lỗ Kịch Bản"
+    floor_val = spot_data.dca_zone_aggressive if is_spot_plan else invalidation_px
+    st.markdown(
+        f"""
+        <div class="ci-metric-card">
+            <div class="ci-metric-label">{floor_label}</div>
+            <div class="ci-metric-val">${floor_val:,.2f}</div>
+            <div class="ci-metric-sub">{'Vùng hỗ trợ chu kỳ' if is_spot_plan else 'Worst-case stop'}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-# --- 4 Main Clean Tabs ---
+# --- 4 Concise Tabs (Never Truncated) ---
 tab_socratic, tab_spot, tab_futures, tab_accounting = st.tabs([
-    "🛡️ 1. Phản Biện Chống Đu Đỉnh (Socratic Audit)",
-    "🎯 2. Kế Hoạch Mua Gom & Chốt Lời (DCA & TP)",
-    "⚡ 3. Rủi Ro Đòn Bẩy & Thanh Lý (Futures)",
-    "💼 4. Quản Trị Danh Mục (Thông Tư 200)",
+    "🛡️ Phản Biện Socratic",
+    "🎯 Vùng DCA & Chốt Lời",
+    "⚡ Đòn Bẩy Futures",
+    "💼 Sổ Cái TT 200",
 ])
 
 # ==================== TAB 1: SOCRATIC AUDIT ====================
 with tab_socratic:
-    st.markdown("#### 🗣️ 3 Câu Hỏi Chất Vấn Chí Mạng Của Biện Lý Socratic (Devil's Advocate)")
+    st.markdown("#### 🗣️ 3 Câu Hỏi Chất Vấn Chí Mạng (Socratic Devil's Advocate)")
     st.caption("Hãy tự trả lời trung thực 3 câu hỏi dưới đây trước khi bạn bấm nút Mua/Bán trên sàn giao dịch.")
 
     fatal_questions = audit_state.get("fatal_socratic_questions", [])
@@ -352,7 +457,7 @@ with tab_socratic:
                 f"""
                 <div class="socratic-card">
                     <b style="color: #38bdf8;">❓ Câu hỏi chất vấn {idx}:</b><br/>
-                    <span style="font-size: 1.02rem; color: #e2e8f0;">{q}</span>
+                    <span style="font-size: 1.0rem; color: #f1f5f9; line-height: 1.5;">{q}</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -378,17 +483,17 @@ with tab_spot:
     with col_dca:
         st.markdown("##### 📥 Vùng Giá Mua Gom (DCA Accumulation)")
         st.info(
-            f"🔹 **Vùng 1 (Thận trọng - Tỷ trọng 25%):**  \n"
+            f"🔹 **Vùng 1 (Thận trọng - Tỷ trọng 25% vốn):**  \n"
             f"**${spot_data.dca_zone_conservative:,.2f}**  \n"
             f"*(Chiết khấu -8% từ giá thị trường, phù hợp đặt lệnh Limit đầu tiên)*"
         )
         st.info(
-            f"🔹 **Vùng 2 (Vừa phải - Tỷ trọng 35%):**  \n"
+            f"🔹 **Vùng 2 (Vừa phải - Tỷ trọng 35% vốn):**  \n"
             f"**${spot_data.dca_zone_moderate:,.2f}**  \n"
             f"*(Vùng giá vốn Realized Price của toàn mạng lưới)*"
         )
         st.info(
-            f"🔹 **Vùng 3 (Bắt đáy chu kỳ - Tỷ trọng 40%):**  \n"
+            f"🔹 **Vùng 3 (Bắt đáy chu kỳ - Tỷ trọng 40% vốn):**  \n"
             f"**${spot_data.dca_zone_aggressive:,.2f}**  \n"
             f"*(Vùng sàn lịch sử 200-Tuần MA - Vùng gom tối ưu nhất)*"
         )
