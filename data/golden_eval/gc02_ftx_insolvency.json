@@ -1,0 +1,34 @@
+{
+  "case_id": "GC-02",
+  "name": "FTX / Alameda Insolvency & CEX Run",
+  "historical_period": "November 2022",
+  "symbol": "FTTUSDT",
+  "scenario_description": "Alameda balance sheet exposed; run on FTX CEX reserves saw stablecoins plunge 85% in 48 hours. FTT collapsed, triggering industry-wide solvency contagion.",
+  "quant_payload": {
+    "current_price": 22.0,
+    "mvrv_zscore": 0.45,
+    "annualized_funding_rate": -85.0,
+    "frsi_score": 12.0,
+    "open_interest_usd": 320000000.0,
+    "oi_change_24h_pct": -40.0,
+    "exchange_inflow_24h_usd": 450000000.0,
+    "exchange_outflow_24h_usd": 2800000000.0,
+    "netflow_24h_usd": -2350000000.0,
+    "cnai_score": 15.0,
+    "orderbook_imbalance_ratio": 0.18,
+    "hard_red_flags": [
+      "CEX_RESERVE_RUN",
+      "SOLVENCY_CONTAGION_CRITICAL",
+      "WITHDRAWAL_HALT_PROBABILITY_HIGH"
+    ]
+  },
+  "expected_evaluation": {
+    "verdict": "REJECT_SETUP_TOO_RISKY",
+    "fomo_index_min": 60.0,
+    "required_socratic_topics": [
+      "immediate capital withdrawal from exchange",
+      "solvency contagion rendering technical charts meaningless",
+      "counterparty custodial risk"
+    ]
+  }
+}

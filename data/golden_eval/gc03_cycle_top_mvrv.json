@@ -1,0 +1,36 @@
+{
+  "case_id": "GC-03",
+  "name": "Cycle Top Euphoria Peak (MVRV Z-Score > 4.5)",
+  "historical_period": "April / November 2021",
+  "symbol": "BTCUSDT",
+  "scenario_description": "Bitcoin printed cyclical all-time highs above $64k accompanied by MVRV Z-Score exceeding 4.8, Mayer Multiple > 2.6, and Pi Cycle Top indicator trigger.",
+  "quant_payload": {
+    "current_price": 64800.0,
+    "mvrv_zscore": 4.85,
+    "mayer_multiple": 2.65,
+    "pi_cycle_top_triggered": true,
+    "annualized_funding_rate": 84.5,
+    "frsi_score": 92.2,
+    "open_interest_usd": 12500000000.0,
+    "oi_change_24h_pct": 18.2,
+    "exchange_inflow_24h_usd": 2800000000.0,
+    "exchange_outflow_24h_usd": 1100000000.0,
+    "netflow_24h_usd": 1700000000.0,
+    "cnai_score": 24.0,
+    "orderbook_imbalance_ratio": 0.42,
+    "hard_red_flags": [
+      "CYCLE_TOP_MVRV_EUPHORIA",
+      "PI_CYCLE_TOP_TRIGGERED"
+    ],
+    "historical_drawdown_risk_pct": 70.0
+  },
+  "expected_evaluation": {
+    "verdict": "REJECT_SETUP_TOO_RISKY",
+    "fomo_index_min": 90.0,
+    "required_socratic_topics": [
+      "MVRV over-extension historical 70%+ drawdown",
+      "long-term cyclical profit-taking vs new spot accumulation",
+      "retail euphoria exit liquidity"
+    ]
+  }
+}
