@@ -16,6 +16,8 @@ from src.agents.nodes import (
     whale_node,
 )
 from src.agents.state import CryptoIntelState, create_initial_state
+from src.llmops.cache import audit_cache
+from src.llmops.langfuse_tracer import llmops_tracer
 
 
 def build_crypto_audit_graph() -> Any:
@@ -58,8 +60,23 @@ async def run_crypto_audit(
     proposed_entry: float | None = None,
     time_horizon_days: int = 30,
     hard_red_flags: list[str] | None = None,
+    use_cache: bool = True,
 ) -> CryptoIntelState:
     """Execute end-to-end multi-agent audit through the compiled LangGraph pipeline."""
+    payload_hash = audit_cache.compute_payload_hash({
+        "spot": spot_valuation_data,
+        "futures": futures_squeeze_data,
+        "whale": whale_flow_data,
+        "action": proposed_action,
+        "entry": proposed_entry,
+        "flags": hard_red_flags,
+    })
+
+    if use_cache:
+        cached_audit = await audit_cache.get("audit", f"{symbol.upper()}:{execution_mode}", payload_hash)
+        if cached_audit is not None:
+            return cast(CryptoIntelState, cached_audit)
+
     initial_state = create_initial_state(
         symbol=symbol,
         execution_mode=execution_mode,
@@ -74,5 +91,31 @@ async def run_crypto_audit(
         hard_red_flags=hard_red_flags,
     )
 
+    trace_id = initial_state["trace_id"]
+    llmops_tracer.trace_audit_start(
+        trace_id=trace_id,
+        symbol=symbol,
+        execution_mode=execution_mode,
+        proposed_action=proposed_action,
+    )
+
     final_state: CryptoIntelState = cast(CryptoIntelState, await audit_workflow_app.ainvoke(initial_state))
+
+    llmops_tracer.trace_audit_end(
+        trace_id=trace_id,
+        anti_fomo_verdict=final_state.get("anti_fomo_verdict", "UNKNOWN"),
+        fomo_index=final_state.get("fomo_index", 0.0),
+        fatal_questions=final_state.get("fatal_socratic_questions", []),
+        errors=final_state.get("errors"),
+    )
+
+    if use_cache and not final_state.get("errors"):
+        await audit_cache.set(
+            "audit",
+            f"{symbol.upper()}:{execution_mode}",
+            dict(final_state),
+            ttl_seconds=300,
+            payload_hash=payload_hash,
+        )
+
     return final_state
