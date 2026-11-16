@@ -114,9 +114,10 @@ def test_socratic_risk_filter_veto_logic():
     assert approved
 
 
-def test_paper_trading_execution_and_tp_sl_triggers():
+def test_paper_trading_execution_and_tp_sl_triggers(tmp_path):
     """Verify PaperTradingEngine executes simulated orders and auto-triggers TP & SL."""
-    paper = PaperTradingEngine(initial_balance_usd=10_000.0)
+    state_file = str(tmp_path / "test_paper_triggers.json")
+    paper = PaperTradingEngine(initial_balance_usd=10_000.0, state_file=state_file)
 
     order = OrderRequest(
         order_id="trade_test_1",
@@ -181,3 +182,69 @@ async def test_bot_coordinator_lifecycle_and_tick():
     assert tick_res["bot_status"] == "RUNNING"
     coordinator.stop()
     assert coordinator.status == BotStatus.STOPPED
+
+
+def test_paper_trading_disk_persistence(tmp_path):
+    """Verify state persists to disk and reloads accurately on engine restart."""
+    state_file = str(tmp_path / "paper_state.json")
+    paper1 = PaperTradingEngine(initial_balance_usd=10_000.0, state_file=state_file)
+
+    order = OrderRequest(
+        order_id="persist_test_1",
+        symbol="BTCUSDT",
+        direction=SignalDirection.BUY,
+        quantity=0.1,
+        price=60000.0,
+        stop_loss=59000.0,
+        take_profit=63000.0,
+        risk_usd=100.0,
+        strategy=StrategyType.LIQUIDATION_SWEEP_REVERSAL,
+        mode=BotMode.PAPER_TRADING,
+    )
+    paper1.execute_order(order)
+    paper1.update_market_price("BTCUSDT", 63500.0)  # TP hit
+
+    assert len(paper1.completed_trades) == 1
+    assert paper1.completed_trades[0].realized_pnl_usd > 0
+
+    # Simulate process termination and reinitialization
+    paper2 = PaperTradingEngine(initial_balance_usd=10_000.0, state_file=state_file)
+    assert len(paper2.completed_trades) == 1
+    assert paper2.completed_trades[0].trade_id == "persist_test_1"
+    assert paper2.balance_usd == paper1.balance_usd
+
+    # Test reset
+    paper2.reset_account(initial_balance=10_000.0)
+    assert len(paper2.completed_trades) == 0
+    assert paper2.balance_usd == 10_000.0
+
+
+def test_historical_backtester_simulation():
+    """Verify HistoricalBacktester runs deterministic math on synthetic klines."""
+    from src.execution.backtest_engine import HistoricalBacktester
+
+    tester = HistoricalBacktester(initial_balance_usd=10_000.0)
+
+    # Generate 100 synthetic candles with an oscillating bounce
+    synthetic_klines = []
+    base_price = 60000.0
+    for idx in range(100):
+        # Create a dip and bounce
+        price = base_price - (idx * 50.0) if idx < 50 else base_price - 2500.0 + ((idx - 50) * 80.0)
+        synthetic_klines.append({
+            "open_time": idx * 3600000,
+            "open": price,
+            "high": price + 200.0,
+            "low": price - 200.0,
+            "close": price + 50.0,
+            "volume": 100.0,
+            "close_time": (idx + 1) * 3600000 - 1,
+        })
+
+    result = tester.simulate(synthetic_klines, symbol="BTCUSDT", interval="1h")
+    assert result.total_candles == 100
+    assert result.initial_balance == 10_000.0
+    assert isinstance(result.win_rate_pct, float)
+    assert isinstance(result.profit_factor, float)
+    assert isinstance(result.expected_value_r, float)
+

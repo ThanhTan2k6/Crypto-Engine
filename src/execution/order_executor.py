@@ -7,6 +7,7 @@ Supports:
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import time
@@ -40,14 +41,76 @@ class PaperTradingEngine:
     and automatically books transactions into the TT 200 Accounting Ledger.
     """
 
-    def __init__(self, initial_balance_usd: float = 10_000.0, fee_rate: float = 0.0004) -> None:
+    def __init__(
+        self,
+        initial_balance_usd: float = 10_000.0,
+        fee_rate: float = 0.0004,
+        state_file: str | None = None,
+    ) -> None:
         self.initial_balance = float(initial_balance_usd)
         self.balance_usd: float = float(initial_balance_usd)
         self.fee_rate = fee_rate  # 0.04% standard maker/taker fee
+        self.state_file: str = str(state_file or os.getenv("BOT_STATE_FILE") or "data/paper_trading_state.json")
         self.active_positions: dict[str, TradeRecord] = {}  # trade_id -> TradeRecord
         self.completed_trades: list[TradeRecord] = []
         self._peak_balance: float = float(initial_balance_usd)
         self._max_drawdown_pct: float = 0.0
+
+        self._load_from_disk()
+
+    def _save_to_disk(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+            data = {
+                "initial_balance": self.initial_balance,
+                "balance_usd": self.balance_usd,
+                "peak_balance": self._peak_balance,
+                "max_drawdown_pct": self._max_drawdown_pct,
+                "active_positions": {k: v.model_dump_json() for k, v in self.active_positions.items()},
+                "completed_trades": [t.model_dump_json() for t in self.completed_trades],
+            }
+            with open(self.state_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except OSError as e:
+            logger.warning("Failed to persist bot state to %s: %s", self.state_file, e)
+
+    def _load_from_disk(self) -> None:
+        if not os.path.exists(self.state_file):
+            return
+        try:
+            with open(self.state_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.initial_balance = float(data.get("initial_balance", self.initial_balance))
+            self.balance_usd = float(data.get("balance_usd", self.balance_usd))
+            self._peak_balance = float(data.get("peak_balance", self._peak_balance))
+            self._max_drawdown_pct = float(data.get("max_drawdown_pct", self._max_drawdown_pct))
+
+            self.active_positions = {
+                k: TradeRecord.model_validate_json(v)
+                for k, v in data.get("active_positions", {}).items()
+            }
+            self.completed_trades = [
+                TradeRecord.model_validate_json(t)
+                for t in data.get("completed_trades", [])
+            ]
+            logger.info(
+                "Loaded %d completed trades and %d open positions from %s",
+                len(self.completed_trades),
+                len(self.active_positions),
+                self.state_file,
+            )
+        except (json.JSONDecodeError, ValueError, OSError) as e:
+            logger.warning("Could not parse existing bot state from %s: %s", self.state_file, e)
+
+    def reset_account(self, initial_balance: float = 10_000.0) -> None:
+        """Reset paper account balance and clear persisted trade history."""
+        self.initial_balance = float(initial_balance)
+        self.balance_usd = float(initial_balance)
+        self.active_positions.clear()
+        self.completed_trades.clear()
+        self._peak_balance = float(initial_balance)
+        self._max_drawdown_pct = 0.0
+        self._save_to_disk()
 
     def execute_order(self, order: OrderRequest) -> TradeRecord:
         """Execute simulated order and register open position."""
@@ -69,6 +132,7 @@ class PaperTradingEngine:
             mode=BotMode.PAPER_TRADING,
         )
         self.active_positions[order.order_id] = trade
+        self._save_to_disk()
 
         # Book into Circular 200 Accounting Ledger
         try:
@@ -162,6 +226,9 @@ class PaperTradingEngine:
                 self.completed_trades.append(pos)
                 closed_this_tick.append(pos)
                 del self.active_positions[tid]
+
+        if closed_this_tick:
+            self._save_to_disk()
 
         return closed_this_tick
 

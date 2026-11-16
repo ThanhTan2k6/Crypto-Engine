@@ -62,3 +62,6 @@ coverage.xml
 # OS generated
 .DS_Store
 Thumbs.db
+
+# Runtime data & bot state
+data/paper_trading_state*.json

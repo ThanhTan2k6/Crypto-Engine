@@ -28,6 +28,7 @@ from src.engine.accounting_tt200 import (
 from src.engine.core_quant import CoreQuantEngine, get_symbol_market_profile
 from src.execution import (
     BotMode,
+    HistoricalBacktester,
     SignalDirection,
     trading_bot_coordinator,
 )
@@ -687,8 +688,14 @@ with tab_bot:
         "Tỷ lệ R:R cố định 1:1.5 - 1:2.0 • Lọc rủi ro Socratic Veto • Tự động hạch toán Thông tư 200."
     )
 
+    st.info(
+        "💾 **Dữ liệu được lưu trữ tự động**: Mọi vị thế mở, lịch sử lệnh và tỷ lệ thắng được lưu tại "
+        "`data/paper_trading_state.json`. Khi bạn tắt máy, đóng terminal hay restart, toàn bộ số dư và "
+        "winrate được bảo lưu 100%."
+    )
+
     # Bot Status & Control Row
-    bc_col1, bc_col2, bc_col3, bc_col4 = st.columns([2, 1, 1, 2])
+    bc_col1, bc_col2, bc_col3, bc_col4, bc_col5 = st.columns([2, 1, 1, 1.5, 1.2])
     with bc_col1:
         st.markdown(
             f"Trạng thái: **{trading_bot_coordinator.status.value}** | Chế độ: **{trading_bot_coordinator.mode.value}**"
@@ -702,7 +709,11 @@ with tab_bot:
             trading_bot_coordinator.stop()
             st.rerun()
     with bc_col4:
-        trigger_tick = st.button("⚡ Quét & Khớp Lệnh Ngay", use_container_width=True)
+        trigger_tick = st.button("⚡ Quét & Khớp Lệnh", use_container_width=True)
+    with bc_col5:
+        if st.button("🔄 Đặt Lại Ví", use_container_width=True):
+            trading_bot_coordinator.paper_engine.reset_account()
+            st.rerun()
 
     if trigger_tick:
         with st.spinner("Bot đang quét tín hiệu và kiểm tra Socratic Veto..."):
@@ -790,6 +801,91 @@ with tab_bot:
                 st.caption(f"`{item['timestamp']}` - **[{item['event']}]** {item['message']}")
         else:
             st.caption("Chưa có sự kiện nào.")
+
+    # Historical Backtest Section
+    st.markdown("---")
+    st.markdown("### 🧪 Khảo Sát Winrate Lịch Sử (Historical Backtesting)")
+    st.caption(
+        "Kiểm định tỷ lệ thắng (Winrate) và Lợi nhuận kỳ vọng (EV) ngay lập tức trên dữ liệu nến thật từ Binance "
+        "mà không cần mở máy 24/7 hay chờ đợi nhiều tuần."
+    )
+
+    bk_c1, bk_c2, bk_c3, bk_c4 = st.columns([2, 1, 1, 2])
+    with bk_c1:
+        bk_strat = st.selectbox(
+            "Chiến lược kiểm định",
+            [
+                "TREND_PULLBACK (Bám trend EMA50 R:R 1:2.0)",
+                "COMBINED_QUANT (Tổng hợp Trend Pullback + Sweep)",
+                "LIQUIDATION_SWEEP (Bắt râu đảo chiều biên độ)",
+            ],
+            index=0,
+        )
+    with bk_c2:
+        bk_interval = st.selectbox("Khung nến", ["15m", "1h", "4h"], index=0)
+    with bk_c3:
+        bk_candles = st.selectbox("Số lượng nến", [100, 300, 500, 1000], index=3)
+    with bk_c4:
+        st.write("")
+        run_bk_btn = st.button("⚡ Chạy Backtest Binance Ngay", type="primary", use_container_width=True)
+
+    if run_bk_btn:
+        strat_key = (
+            "TREND_PULLBACK"
+            if "TREND_PULLBACK" in bk_strat
+            else "LIQUIDATION_SWEEP"
+            if "LIQUIDATION_SWEEP" in bk_strat
+            else "COMBINED_QUANT"
+        )
+        with st.spinner(f"Đang tải {bk_candles} nến {bk_interval} từ Binance và chạy mô phỏng toán học..."):
+            tester = HistoricalBacktester()
+            bk_res = asyncio.run(
+                tester.run_backtest(
+                    symbol=active_symbol,
+                    interval=bk_interval,
+                    candle_count=bk_candles,
+                    strategy_mode=strat_key,
+                )
+            )
+
+        res_c1, res_c2, res_c3, res_c4, res_c5 = st.columns(5)
+        with res_c1:
+            st.metric("Tổng Số Lệnh", f"{bk_res.total_trades}")
+        with res_c2:
+            st.metric(
+                "Tỷ Lệ Thắng",
+                f"{bk_res.win_rate_pct:.1f}%",
+                f"{bk_res.winning_trades}W - {bk_res.losing_trades}L",
+            )
+        with res_c3:
+            st.metric("Hệ Số Lợi Nhuận (PF)", f"{bk_res.profit_factor:.2f}")
+        with res_c4:
+            st.metric("Kỳ Vọng Toán Học (EV)", f"{bk_res.expected_value_r:+.2f} R")
+        with res_c5:
+            st.metric(
+                "Lợi Nhuận / Sụt Giảm",
+                f"${bk_res.total_pnl_usd:+,.2f}",
+                f"Max DD: {bk_res.max_drawdown_pct:.1f}%",
+            )
+
+        if bk_res.trades:
+            st.markdown("##### 📜 Chi Tiết Các Lệnh Đã Kiểm Định Trong Quá Khứ")
+            bk_trade_rows = [
+                {
+                    "#": t.trade_id,
+                    "Chiều": t.direction.value,
+                    "Chiến lược": t.strategy,
+                    "Giá vào": f"${t.entry_price:,.2f}",
+                    "Giá thoát": f"${t.exit_price:,.2f}",
+                    "Cắt lỗ (SL)": f"${t.stop_loss:,.2f}",
+                    "Chốt lời (TP)": f"${t.take_profit:,.2f}",
+                    "Kết quả": "🟢 THẮNG" if t.is_winner else "🔴 THUA",
+                    "Lý do": t.exit_reason,
+                    "PnL ($)": f"${t.pnl_usd:+,.2f}",
+                }
+                for t in reversed(bk_res.trades)
+            ]
+            st.dataframe(bk_trade_rows, use_container_width=True, hide_index=True)
 
 # --- Footer Disclaimer ---
 st.markdown("---")

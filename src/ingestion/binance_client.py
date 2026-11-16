@@ -89,3 +89,26 @@ class BinancePublicClient:
                 "asks": asks,
                 "timestamp": datetime.now(UTC),
             }
+
+    async def get_historical_klines(
+        self, symbol: str = "BTCUSDT", interval: str = "1h", limit: int = 500
+    ) -> list[dict[str, Any]]:
+        """Fetch historical kline/candlestick bars from Binance Futures."""
+        url = f"{BINANCE_FUTURES_BASE_URL}/fapi/v1/klines"
+        params: dict[str, str | int] = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            raw_klines = resp.json()
+            return [
+                {
+                    "open_time": int(k[0]),
+                    "open": float(k[1]),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                    "close_time": int(k[6]),
+                }
+                for k in raw_klines
+            ]
