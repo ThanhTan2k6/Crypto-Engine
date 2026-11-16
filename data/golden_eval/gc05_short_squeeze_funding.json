@@ -1,0 +1,31 @@
+{
+  "case_id": "GC-05",
+  "name": "Extreme Funding Rate Short Squeeze Trap (-0.12% 8h Funding)",
+  "historical_period": "January 2023 / October 2023",
+  "symbol": "BTCUSDT",
+  "scenario_description": "Crowded retail short positioning at support breakdown caused 8h funding rate to plunge to -0.12% (-131% APR) with Long/Short ratio at 0.32, setting up an explosive short squeeze.",
+  "quant_payload": {
+    "current_price": 27200.0,
+    "annualized_funding_rate": -131.4,
+    "frsi_score": 10.5,
+    "open_interest_usd": 8500000000.0,
+    "oi_change_24h_pct": 22.5,
+    "long_short_ratio": 0.32,
+    "orderbook_imbalance_ratio": 0.72,
+    "liquidation_pocket_above": 28400.0,
+    "hard_red_flags": [
+      "EXTREME_SHORT_SQUEEZE_SETUP",
+      "CROWDED_PERPETUAL_SHORTS"
+    ]
+  },
+  "expected_evaluation": {
+    "verdict": "PROCEED_WITH_CAUTION",
+    "fomo_index_min": 25.0,
+    "expected_invalidation_price": 26400.0,
+    "required_socratic_topics": [
+      "financing fee carry penalty for short sellers",
+      "liquidation cascade above local resistance",
+      "market maker stop-hunt incentive"
+    ]
+  }
+}

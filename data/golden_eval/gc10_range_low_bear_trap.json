@@ -1,0 +1,34 @@
+{
+  "case_id": "GC-10",
+  "name": "Range-Low Bear Trap (Capitulation at 200W-MA)",
+  "historical_period": "November 2022 / June 2023",
+  "symbol": "BTCUSDT",
+  "scenario_description": "Price sliced below psychological support accompanied by peak social media panic; however, MVRV hit 0.08, price tested the 200W-MA, and whale cold storage withdrawals surged.",
+  "quant_payload": {
+    "current_price": 16500.0,
+    "mvrv_zscore": 0.08,
+    "sma_200w": 16200.0,
+    "mayer_multiple": 0.62,
+    "exchange_inflow_24h_usd": 320000000.0,
+    "exchange_outflow_24h_usd": 1050000000.0,
+    "netflow_24h_usd": -730000000.0,
+    "cnai_score": 88.5,
+    "annualized_funding_rate": -35.2,
+    "frsi_score": 32.4,
+    "orderbook_imbalance_ratio": 0.68,
+    "hard_red_flags": [
+      "PEAK_RETAIL_PANIC",
+      "SMART_MONEY_ACCUMULATION_DIVERGENCE"
+    ]
+  },
+  "expected_evaluation": {
+    "verdict": "SCALE_IN_SPOT",
+    "fomo_index_min": 15.0,
+    "expected_invalidation_price": 14500.0,
+    "required_socratic_topics": [
+      "smart money cold storage accumulation during panic",
+      "MVRV generational bottom percentile",
+      "systematic DCA scaling vs panic selling"
+    ]
+  }
+}

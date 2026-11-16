@@ -1,0 +1,32 @@
+{
+  "case_id": "GC-07",
+  "name": "FED Hawkish Pause / Rate Cut Pivot Trap",
+  "historical_period": "January / February 2024",
+  "symbol": "BTCUSDT",
+  "scenario_description": "Traders piled into leveraged longs expecting an immediate March rate cut; however, sticky CPI and hawkish Fed statements sent CME rate cut odds crashing from 85% to 15%.",
+  "quant_payload": {
+    "current_price": 43500.0,
+    "fed_funds_rate": 5.33,
+    "cpi_yoy": 3.4,
+    "dxy_index": 104.8,
+    "yield_10y": 4.28,
+    "cme_rate_cut_prob_next_fomc": 0.15,
+    "macro_liquidity_score": -4.8,
+    "macro_regime": "RISK_OFF",
+    "annualized_funding_rate": 42.0,
+    "hard_red_flags": [
+      "MACRO_RESTRICTIVE_LIQUIDITY",
+      "FED_RATE_CUT_PRICING_MISMATCH"
+    ]
+  },
+  "expected_evaluation": {
+    "verdict": "PROCEED_WITH_CAUTION",
+    "fomo_index_min": 65.0,
+    "expected_invalidation_price": 41200.0,
+    "required_socratic_topics": [
+      "disconnect between market rate-cut pricing and Fed guidance",
+      "cost of capital impact on speculative multiples",
+      "DXY strength pressure on crypto beta"
+    ]
+  }
+}
