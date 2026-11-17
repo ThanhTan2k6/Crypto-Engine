@@ -124,4 +124,12 @@ class SocraticRiskFilter:
             if signal.direction == SignalDirection.BUY and netflow >= 1_000_000_000.0:
                 return False, f"VETOED: Mega CEX Inflow (${netflow / 1e6:,.1f}M) detected. High probability of dump."
 
+        # Gate 5: Severe Waterfall Downtrend Knife Catching Veto
+        if quant_data:
+            spot = quant_data.get("spot")
+            if spot and signal.direction == SignalDirection.BUY and signal.strategy == StrategyType.LIQUIDATION_SWEEP_REVERSAL:
+                mayer = getattr(spot, "mayer_multiple", 1.0)
+                if mayer < 0.85:
+                    return False, f"VETOED: Catching falling knives in aggressive macro waterfall dump (Mayer Multiple: {mayer:.2f} < 0.85) is prohibited."
+
         return True, "Approved by Socratic Risk Auditor."

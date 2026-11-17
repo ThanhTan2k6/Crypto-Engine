@@ -172,8 +172,9 @@ class HistoricalBacktester:
                         signal_direction = None
 
             # Strategy 2: Liquidation Sweep Reversal (Mean reversion at volatility extremes)
+            # Enforce Trend Filter: Do NOT catch falling knives if price is breaking down sharply under EMA50 (>2%)
             if not signal_direction and strategy_mode in ("COMBINED_QUANT", "LIQUIDATION_SWEEP"):
-                if c_low < lower_band and wick_bottom > body and c_price > c_low:
+                if c_low < lower_band and wick_bottom > body and c_price > c_low and c_price >= (c_ema * 0.98):
                     signal_direction = SignalDirection.BUY
                     strat_label = "LIQUIDATION_SWEEP_LONG"
                     stop_loss = round(c_low * 0.995, 2)
@@ -183,7 +184,7 @@ class HistoricalBacktester:
                     else:
                         signal_direction = None
 
-                elif c_high > upper_band and wick_top > body and c_price < c_high:
+                elif c_high > upper_band and wick_top > body and c_price < c_high and c_price <= (c_ema * 1.02):
                     signal_direction = SignalDirection.SELL
                     strat_label = "LIQUIDATION_SWEEP_SHORT"
                     stop_loss = round(c_high * 1.005, 2)
